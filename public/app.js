@@ -194,7 +194,7 @@ function renderParticipantes() {
   if (estado.primeiraPartidaComecou) {
     avisoConfig = '<div class="aviso">O torneio já começou. Não é mais possível alterar participantes nem a configuração — reinicie o torneio para começar do zero.</div>';
   } else if (estado.faseGruposGerada) {
-    avisoConfig = '<div class="aviso">Fase de grupos já gerada — não dá mais para adicionar participantes ou mudar o número de grupos, mas você ainda pode editar o nome ou remover alguém até a primeira partida ser jogada.</div>';
+    avisoConfig = '<div class="aviso">Fase de grupos já gerada — não dá mais para mudar o número de grupos, mas você ainda pode adicionar, editar ou remover participantes até a primeira partida ser jogada. Quem for adicionado entra automaticamente no grupo com menos jogadores.</div>';
   }
 
   app.innerHTML = `
@@ -208,7 +208,7 @@ function renderParticipantes() {
 
     <div class="card">
       <h2>2. Participantes <span class="selo">${estado.participantes.length} adicionados</span></h2>
-      ${!estado.faseGruposGerada ? `
+      ${podeEditarLista ? `
         <div class="linha-form">
           <input type="text" id="inNomeParticipante" placeholder="Nome do jogador (será o nome do time)" maxlength="30">
           <button class="btn" id="btnAddParticipante">Adicionar</button>

@@ -146,11 +146,21 @@ class ErroApi extends Error {
 function acaoAdicionarParticipante({ nome }) {
   const limpo = String(nome || '').trim();
   if (!limpo) throw new ErroApi('Informe um nome.');
-  if (estado.faseGruposGerada) throw new ErroApi('A fase de grupos já foi gerada.');
+  if (algumaPartidaJogada()) throw new ErroApi('O torneio já começou — não é mais possível adicionar participantes.');
   if (estado.participantes.some((p) => p.nome.toLowerCase() === limpo.toLowerCase())) {
     throw new ErroApi('Já existe um participante com esse nome.');
   }
   estado.participantes.push({ id: uid(), nome: limpo });
+
+  if (estado.faseGruposGerada) {
+    // Fase já gerada: entra no grupo com menos times (ocupa a vaga de quem foi removido).
+    let grupoAlvo = estado.grupos[0];
+    for (const g of estado.grupos) {
+      if (g.times.length < grupoAlvo.times.length) grupoAlvo = g;
+    }
+    grupoAlvo.times.push(limpo);
+    grupoAlvo.partidas = gerarPartidasGrupo(grupoAlvo.times);
+  }
 }
 
 function acaoRemoverParticipante(id) {
