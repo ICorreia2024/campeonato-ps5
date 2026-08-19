@@ -125,6 +125,7 @@ function montarEstadoPublico() {
     primeiraPartidaComecou: algumaPartidaJogada(),
     participantes: participantesComGrupo,
     campeao: estado.campeao,
+    finalistas: calcularFinalistas(),
     gruposPorTime: estado.faseGruposGerada ? null : participantesPorGrupo(),
     grupos: estado.grupos.map((g) => ({
       nome: g.nome,
@@ -283,6 +284,7 @@ function acaoSalvarPlacarMataMata(rodadaIdx, partidaIdx, golsCasa, golsFora, pen
     partida.penaltis = false;
   }
 
+  let finalDefinida = false;
   const rodadaCompleta = rodada.every((m) => m.vencedor);
   if (rodadaCompleta) {
     if (rodada.length === 1) {
@@ -293,9 +295,19 @@ function acaoSalvarPlacarMataMata(rodadaIdx, partidaIdx, golsCasa, golsFora, pen
         proxima.push(criarPartidaMM(rodada[i].vencedor, rodada[i + 1].vencedor));
       }
       estado.mataMata.rounds.push(proxima);
+      finalDefinida = proxima.length === 1;
     }
   }
-  return { aguardandoPenalti: false };
+  return { aguardandoPenalti: false, finalDefinida };
+}
+
+function calcularFinalistas() {
+  if (!estado.mataMata || estado.campeao) return null;
+  const ultimaRodada = estado.mataMata.rounds[estado.mataMata.rounds.length - 1];
+  if (ultimaRodada.length !== 1) return null;
+  const [confronto] = ultimaRodada;
+  if (!confronto.casa || !confronto.fora) return null;
+  return { casa: confronto.casa, fora: confronto.fora };
 }
 
 function acaoReiniciar() {

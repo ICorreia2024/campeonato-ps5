@@ -135,6 +135,9 @@ async function salvarPlacarMM(rodadaIdx, partidaIdx, golsCasa, golsFora, penVenc
       pendentePenalti = null;
     }
     await atualizarEstado(dados);
+    if (dados.finalDefinida && dados.finalistas) {
+      toast(`🏁 Final definida: ${dados.finalistas.casa} x ${dados.finalistas.fora}!`, 'ok');
+    }
   } catch (e) { toast(e.message, 'erro'); }
 }
 
@@ -433,7 +436,15 @@ function renderMataMata() {
     return;
   }
 
+  const bannerFinal = estado.finalistas ? `
+    <div class="banner-final">
+      🏁 <strong>Grande Final definida!</strong><br>
+      ${esc(estado.finalistas.casa)} <span class="vs">×</span> ${esc(estado.finalistas.fora)}
+    </div>
+  ` : '';
+
   app.innerHTML = `
+    ${bannerFinal}
     <div class="card" style="overflow:visible;">
       <h2>Fase Eliminatória</h2>
       <div class="bracket">
