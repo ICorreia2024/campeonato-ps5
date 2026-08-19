@@ -126,6 +126,14 @@ select { min-width: 220px; }
   border: none; background: transparent; color: var(--vermelho);
   font-size: 1rem; cursor: pointer; padding: 2px 6px;
 }
+.acoes-participante { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.btn-icone {
+  border: none; background: transparent; color: var(--texto-suave);
+  font-size: 1rem; cursor: pointer; padding: 2px 6px; border-radius: 6px;
+}
+.btn-icone:hover { color: var(--verde); background: #eef2ef; }
+.linha-edicao { display: flex; align-items: center; gap: 6px; width: 100%; flex-wrap: wrap; }
+.linha-edicao input[type="text"] { flex: 1; min-width: 120px; }
 
 .grupos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
 

@@ -14,6 +14,7 @@ function paraInputData(iso) {
 let estado = null;
 let abaAtiva = 'participantes';
 let pendentePenalti = null; // { rodadaIdx, partidaIdx }
+let editandoParticipanteId = null;
 let intervaloAtualizacao = null;
 
 let toastTimer;
@@ -70,8 +71,32 @@ async function adicionarParticipante(nome) {
 }
 
 async function removerParticipante(id) {
+  if (!confirm('Remover este participante?')) return;
   try {
     const dados = await api(`/api/participantes/${id}`, 'DELETE');
+    await atualizarEstado(dados);
+  } catch (e) { toast(e.message, 'erro'); }
+}
+
+function editarParticipante(id) {
+  editandoParticipanteId = id;
+  render();
+  requestAnimationFrame(() => {
+    document.querySelector(`.in-editar-nome[data-id="${id}"]`)?.focus();
+  });
+}
+
+function cancelarEdicaoParticipante() {
+  editandoParticipanteId = null;
+  render();
+}
+
+async function salvarEdicaoParticipante(id, novoNome) {
+  const limpo = novoNome.trim();
+  if (!limpo) { toast('Informe um nome.', 'erro'); return; }
+  try {
+    const dados = await api(`/api/participantes/${id}`, 'PATCH', { nome: limpo });
+    editandoParticipanteId = null;
     await atualizarEstado(dados);
   } catch (e) { toast(e.message, 'erro'); }
 }
@@ -134,6 +159,7 @@ async function reiniciarTorneio() {
   try {
     const dados = await api('/api/reiniciar', 'POST');
     pendentePenalti = null;
+    editandoParticipanteId = null;
     estado = null;
     abaAtiva = 'participantes';
     document.querySelectorAll('.aba-btn').forEach((b) => b.classList.toggle('ativa', b.dataset.aba === 'participantes'));
@@ -163,13 +189,21 @@ function renderParticipantes() {
     `<option value="${n}" ${estado.numGrupos === n ? 'selected' : ''}>${n} grupos (${n * 2} classificados para o mata-mata)</option>`
   ).join('');
 
+  const podeEditarLista = !estado.primeiraPartidaComecou;
+  let avisoConfig = '';
+  if (estado.primeiraPartidaComecou) {
+    avisoConfig = '<div class="aviso">O torneio já começou. Não é mais possível alterar participantes nem a configuração — reinicie o torneio para começar do zero.</div>';
+  } else if (estado.faseGruposGerada) {
+    avisoConfig = '<div class="aviso">Fase de grupos já gerada — não dá mais para adicionar participantes ou mudar o número de grupos, mas você ainda pode editar o nome ou remover alguém até a primeira partida ser jogada.</div>';
+  }
+
   app.innerHTML = `
     <div class="card">
       <h2>1. Configuração</h2>
       <div class="linha-form">
         <select id="selNumGrupos" ${estado.faseGruposGerada ? 'disabled' : ''}>${opcoesGrupo}</select>
       </div>
-      ${estado.faseGruposGerada ? '<div class="aviso">Fase de grupos já gerada. Reinicie o torneio para mudar a configuração ou os participantes.</div>' : ''}
+      ${avisoConfig}
     </div>
 
     <div class="card">
@@ -182,12 +216,30 @@ function renderParticipantes() {
       ` : ''}
       ${estado.participantes.length === 0 ? '<div class="vazio">Nenhum participante ainda. Adicione os jogadores acima.</div>' : `
         <ul class="lista-participantes">
-          ${estado.participantes.map((p, i) => `
-            <li>
-              <span>${esc(p.nome)} <span class="tag-grupo">Grupo ${LETRAS[i % estado.numGrupos]}</span></span>
-              ${!estado.faseGruposGerada ? `<button class="btn-x" data-acao="remover-participante" data-id="${p.id}">✕</button>` : ''}
-            </li>
-          `).join('')}
+          ${estado.participantes.map((p) => {
+            if (editandoParticipanteId === p.id) {
+              return `
+                <li>
+                  <span class="linha-edicao">
+                    <input type="text" class="in-editar-nome" data-id="${p.id}" value="${esc(p.nome)}" maxlength="30">
+                    <button class="btn btn-pequeno" data-acao="salvar-edicao" data-id="${p.id}">Salvar</button>
+                    <button class="btn btn-pequeno btn-secundario" data-acao="cancelar-edicao">Cancelar</button>
+                  </span>
+                </li>
+              `;
+            }
+            return `
+              <li>
+                <span>${esc(p.nome)} ${p.grupoNome ? `<span class="tag-grupo">Grupo ${p.grupoNome}</span>` : ''}</span>
+                ${podeEditarLista ? `
+                  <span class="acoes-participante">
+                    <button class="btn-icone" data-acao="editar-participante" data-id="${p.id}" title="Editar nome">✎</button>
+                    <button class="btn-x" data-acao="remover-participante" data-id="${p.id}" title="Remover">✕</button>
+                  </span>
+                ` : ''}
+              </li>
+            `;
+          }).join('')}
         </ul>
       `}
     </div>
@@ -221,6 +273,22 @@ function renderParticipantes() {
   app.querySelectorAll('[data-acao="remover-participante"]').forEach((b) =>
     b.addEventListener('click', () => removerParticipante(b.dataset.id))
   );
+  app.querySelectorAll('[data-acao="editar-participante"]').forEach((b) =>
+    b.addEventListener('click', () => editarParticipante(b.dataset.id))
+  );
+  app.querySelectorAll('[data-acao="cancelar-edicao"]').forEach((b) =>
+    b.addEventListener('click', cancelarEdicaoParticipante)
+  );
+  app.querySelectorAll('[data-acao="salvar-edicao"]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const input = app.querySelector(`.in-editar-nome[data-id="${b.dataset.id}"]`);
+      salvarEdicaoParticipante(b.dataset.id, input.value);
+    })
+  );
+  app.querySelector('.in-editar-nome')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.target.closest('.linha-edicao').querySelector('[data-acao="salvar-edicao"]').click(); }
+    if (e.key === 'Escape') cancelarEdicaoParticipante();
+  });
 }
 
 function tabelaClassificacaoHtml(grupo) {
@@ -439,7 +507,16 @@ app.addEventListener('change', (e) => {
   }
 });
 
+function usuarioDigitando() {
+  const el = document.activeElement;
+  return !!el && ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName);
+}
+
 carregarDoServidor({ inicial: true });
 
 // Mantém a página sincronizada entre todos os participantes que a acessam ao mesmo tempo.
-intervaloAtualizacao = setInterval(() => carregarDoServidor(), 5000);
+// Pula a atualização enquanto alguém estiver digitando, para não perder o foco do campo (e o teclado, no celular).
+intervaloAtualizacao = setInterval(() => {
+  if (usuarioDigitando()) return;
+  carregarDoServidor();
+}, 5000);

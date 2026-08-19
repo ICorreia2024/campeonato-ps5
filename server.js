@@ -86,6 +86,10 @@ function faseGruposCompleta() {
   return estado.grupos.length > 0 && estado.grupos.every(grupoCompleto);
 }
 
+function algumaPartidaJogada() {
+  return estado.grupos.some((g) => g.partidas.some((p) => p.golsCasa != null || p.golsFora != null));
+}
+
 function criarPartidaMM(casa, fora) {
   return { id: uid(), casa, fora, golsCasa: null, golsFora: null, vencedor: null, penaltis: false, data: null };
 }
@@ -104,10 +108,22 @@ function gerarMataMata() {
 /* ============================ VIEW MODEL (o que a API expõe) ============================ */
 
 function montarEstadoPublico() {
+  const participantesComGrupo = estado.participantes.map((p, i) => {
+    let grupoNome = null;
+    if (estado.faseGruposGerada) {
+      const idx = estado.grupos.findIndex((g) => g.times.includes(p.nome));
+      grupoNome = idx >= 0 ? LETRAS[idx] : null;
+    } else {
+      grupoNome = LETRAS[i % estado.numGrupos];
+    }
+    return { ...p, grupoNome };
+  });
+
   return {
     numGrupos: estado.numGrupos,
     faseGruposGerada: estado.faseGruposGerada,
-    participantes: estado.participantes,
+    primeiraPartidaComecou: algumaPartidaJogada(),
+    participantes: participantesComGrupo,
     campeao: estado.campeao,
     gruposPorTime: estado.faseGruposGerada ? null : participantesPorGrupo(),
     grupos: estado.grupos.map((g) => ({
@@ -138,8 +154,40 @@ function acaoAdicionarParticipante({ nome }) {
 }
 
 function acaoRemoverParticipante(id) {
-  if (estado.faseGruposGerada) throw new ErroApi('A fase de grupos já foi gerada.');
+  if (algumaPartidaJogada()) throw new ErroApi('O torneio já começou — não é mais possível remover participantes.');
+  const participante = estado.participantes.find((p) => p.id === id);
+  if (!participante) throw new ErroApi('Participante não encontrado.', 404);
   estado.participantes = estado.participantes.filter((p) => p.id !== id);
+  if (estado.faseGruposGerada) {
+    const grupo = estado.grupos.find((g) => g.times.includes(participante.nome));
+    if (grupo) {
+      grupo.times = grupo.times.filter((t) => t !== participante.nome);
+      grupo.partidas = grupo.partidas.filter((p) => p.casa !== participante.nome && p.fora !== participante.nome);
+    }
+  }
+}
+
+function acaoEditarParticipante(id, novoNome) {
+  if (algumaPartidaJogada()) throw new ErroApi('O torneio já começou — não é mais possível editar participantes.');
+  const limpo = String(novoNome || '').trim();
+  if (!limpo) throw new ErroApi('Informe um nome.');
+  const participante = estado.participantes.find((p) => p.id === id);
+  if (!participante) throw new ErroApi('Participante não encontrado.', 404);
+  if (estado.participantes.some((p) => p.id !== id && p.nome.toLowerCase() === limpo.toLowerCase())) {
+    throw new ErroApi('Já existe um participante com esse nome.');
+  }
+  const nomeAntigo = participante.nome;
+  participante.nome = limpo;
+  if (estado.faseGruposGerada && nomeAntigo !== limpo) {
+    const grupo = estado.grupos.find((g) => g.times.includes(nomeAntigo));
+    if (grupo) {
+      grupo.times = grupo.times.map((t) => (t === nomeAntigo ? limpo : t));
+      grupo.partidas.forEach((p) => {
+        if (p.casa === nomeAntigo) p.casa = limpo;
+        if (p.fora === nomeAntigo) p.fora = limpo;
+      });
+    }
+  }
 }
 
 function acaoDefinirConfig({ numGrupos }) {
@@ -306,6 +354,14 @@ const servidor = http.createServer(async (req, res) => {
     // DELETE /api/participantes/:id
     if (req.method === 'DELETE' && partes[1] === 'participantes' && partes.length === 3) {
       acaoRemoverParticipante(partes[2]);
+      salvarEstado();
+      return enviarJson(res, 200, montarEstadoPublico());
+    }
+
+    // PATCH /api/participantes/:id
+    if (req.method === 'PATCH' && partes[1] === 'participantes' && partes.length === 3) {
+      const corpo = await lerCorpo(req);
+      acaoEditarParticipante(partes[2], corpo.nome);
       salvarEstado();
       return enviarJson(res, 200, montarEstadoPublico());
     }
