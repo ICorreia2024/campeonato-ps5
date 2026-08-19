@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d3b24">
+<title>Campeonato EA Sports FC 26 — PS5</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>">
+</head>
+<body>
+
+<div class="topo">
+  <div class="container">
+    <h1>🎮 Campeonato EA Sports FC 26</h1>
+    <div class="sub">PS5 · Fase de grupos + mata-mata</div>
+  </div>
+</div>
+
+<div class="container">
+  <nav class="abas" id="abas">
+    <button data-aba="participantes" class="aba-btn ativa">Participantes</button>
+    <button data-aba="grupos" class="aba-btn">Fase de Grupos</button>
+    <button data-aba="mataMata" class="aba-btn">Mata-Mata</button>
+    <button data-aba="campeao" class="aba-btn">🏆 Campeão</button>
+  </nav>
+
+  <div id="carregando" class="vazio">Carregando…</div>
+  <div id="app"></div>
+
+  <div class="rodape">
+    <button id="btnReiniciar" class="btn btn-perigo btn-pequeno">Reiniciar torneio</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

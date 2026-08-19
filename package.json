@@ -1,0 +1,13 @@
+{
+  "name": "campeonato-ps5",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Campeonato EA Sports FC 26 (PS5) — grupos + mata-mata",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
