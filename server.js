@@ -53,7 +53,7 @@ function gerarPartidasGrupo(times) {
   const partidas = [];
   for (let i = 0; i < times.length; i++) {
     for (let j = i + 1; j < times.length; j++) {
-      partidas.push({ id: uid(), casa: times[i], fora: times[j], golsCasa: null, golsFora: null });
+      partidas.push({ id: uid(), casa: times[i], fora: times[j], golsCasa: null, golsFora: null, data: null });
     }
   }
   return partidas;
@@ -87,7 +87,7 @@ function faseGruposCompleta() {
 }
 
 function criarPartidaMM(casa, fora) {
-  return { id: uid(), casa, fora, golsCasa: null, golsFora: null, vencedor: null, penaltis: false };
+  return { id: uid(), casa, fora, golsCasa: null, golsFora: null, vencedor: null, penaltis: false, data: null };
 }
 
 function gerarMataMata() {
@@ -177,6 +177,29 @@ function acaoSalvarPlacarGrupo(grupoIdx, partidaId, golsCasa, golsFora) {
   }
 }
 
+function normalizarData(data) {
+  const limpo = data == null ? '' : String(data).trim();
+  if (!limpo) return null;
+  if (isNaN(new Date(limpo).getTime())) throw new ErroApi('Data inválida.');
+  return limpo;
+}
+
+function acaoSalvarDataGrupo(grupoIdx, partidaId, data) {
+  const grupo = estado.grupos[grupoIdx];
+  if (!grupo) throw new ErroApi('Grupo não encontrado.', 404);
+  const partida = grupo.partidas.find((p) => p.id === partidaId);
+  if (!partida) throw new ErroApi('Partida não encontrada.', 404);
+  partida.data = normalizarData(data);
+}
+
+function acaoSalvarDataMataMata(rodadaIdx, partidaIdx, data) {
+  if (!estado.mataMata) throw new ErroApi('Mata-mata ainda não foi gerado.', 404);
+  const rodada = estado.mataMata.rounds[rodadaIdx];
+  const partida = rodada && rodada[partidaIdx];
+  if (!partida) throw new ErroApi('Confronto não encontrado.', 404);
+  partida.data = normalizarData(data);
+}
+
 function acaoSalvarPlacarMataMata(rodadaIdx, partidaIdx, golsCasa, golsFora, penVencedor) {
   if (!estado.mataMata) throw new ErroApi('Mata-mata ainda não foi gerado.', 404);
   const rodada = estado.mataMata.rounds[rodadaIdx];
@@ -223,7 +246,10 @@ function acaoReiniciar() {
 
 /* ============================ SERVIDOR HTTP ============================ */
 
-const TIPOS_MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json' };
+const TIPOS_MIME = {
+  '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.svg': 'image/svg+xml', '.webp': 'image/webp'
+};
 
 function lerCorpo(req) {
   return new Promise((resolve, reject) => {
@@ -302,6 +328,22 @@ const servidor = http.createServer(async (req, res) => {
     if (req.method === 'POST' && partes[1] === 'grupos' && partes[4] === 'placar') {
       const corpo = await lerCorpo(req);
       acaoSalvarPlacarGrupo(Number(partes[2]), partes[3], Number(corpo.golsCasa), Number(corpo.golsFora));
+      salvarEstado();
+      return enviarJson(res, 200, montarEstadoPublico());
+    }
+
+    // POST /api/grupos/:grupoIdx/:partidaId/data
+    if (req.method === 'POST' && partes[1] === 'grupos' && partes[4] === 'data') {
+      const corpo = await lerCorpo(req);
+      acaoSalvarDataGrupo(Number(partes[2]), partes[3], corpo.data);
+      salvarEstado();
+      return enviarJson(res, 200, montarEstadoPublico());
+    }
+
+    // POST /api/mata-mata/:rodadaIdx/:partidaIdx/data
+    if (req.method === 'POST' && partes[1] === 'mata-mata' && partes[4] === 'data') {
+      const corpo = await lerCorpo(req);
+      acaoSalvarDataMataMata(Number(partes[2]), Number(partes[3]), corpo.data);
       salvarEstado();
       return enviarJson(res, 200, montarEstadoPublico());
     }

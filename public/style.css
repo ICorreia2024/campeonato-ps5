@@ -29,13 +29,19 @@ body {
 }
 
 .topo {
-  background: linear-gradient(135deg, var(--verde), var(--verde-claro));
-  color: #fff;
-  padding: 28px 0 22px;
+  background: var(--verde);
   margin-bottom: 18px;
+  line-height: 0;
+  box-shadow: var(--sombra);
 }
-.topo h1 { margin: 0 0 4px; font-size: 1.5rem; }
-.topo .sub { opacity: .85; font-size: .9rem; }
+.banner-topo {
+  width: 100%;
+  height: auto;
+  max-height: 300px;
+  object-fit: cover;
+  object-position: center 35%;
+  display: block;
+}
 
 .abas {
   display: flex;
@@ -147,6 +153,8 @@ table.classificacao tr.classifica td:first-child { border-left: 3px solid var(--
 .partida .placar { display: flex; align-items: center; gap: 4px; }
 .partida .encerrada { font-weight: 700; }
 .partida .status-ok { color: var(--gramado); font-size: .78rem; margin-left: 6px; }
+.partida .data-partida { flex-basis: 100%; order: -1; font-size: .8rem; color: var(--texto-suave); display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+.partida .data-partida input[type="datetime-local"] { font-size: .8rem; padding: 5px 8px; }
 
 .pill-pen {
   display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; width: 100%;
@@ -175,6 +183,8 @@ table.classificacao tr.classifica td:first-child { border-left: 3px solid var(--
 .confronto input[type="number"] { width: 42px; }
 .confronto .pen-tag { font-size: .68rem; color: var(--texto-suave); }
 .confronto .aguardando { color: var(--texto-suave); font-style: italic; font-size: .82rem; }
+.confronto .data-partida { font-size: .76rem; color: var(--texto-suave); display: flex; align-items: center; gap: 5px; margin-bottom: 8px; }
+.confronto .data-partida input[type="datetime-local"] { font-size: .76rem; padding: 4px 6px; width: 100%; }
 
 .pagina-campeao {
   text-align: center; padding: 50px 16px 60px;

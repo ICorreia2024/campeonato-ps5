@@ -7,6 +7,10 @@ const LETRAS = 'ABCDEFGH';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 
+function paraInputData(iso) {
+  return iso ? String(iso).slice(0, 16) : '';
+}
+
 let estado = null;
 let abaAtiva = 'participantes';
 let pendentePenalti = null; // { rodadaIdx, partidaIdx }
@@ -106,6 +110,22 @@ async function salvarPlacarMM(rodadaIdx, partidaIdx, golsCasa, golsFora, penVenc
       pendentePenalti = null;
     }
     await atualizarEstado(dados);
+  } catch (e) { toast(e.message, 'erro'); }
+}
+
+async function salvarDataGrupo(grupoIdx, partidaId, data) {
+  try {
+    const dados = await api(`/api/grupos/${grupoIdx}/${partidaId}/data`, 'POST', { data });
+    await atualizarEstado(dados);
+    toast('Data salva.', 'ok');
+  } catch (e) { toast(e.message, 'erro'); }
+}
+
+async function salvarDataMM(rodadaIdx, partidaIdx, data) {
+  try {
+    const dados = await api(`/api/mata-mata/${rodadaIdx}/${partidaIdx}/data`, 'POST', { data });
+    await atualizarEstado(dados);
+    toast('Data salva.', 'ok');
   } catch (e) { toast(e.message, 'erro'); }
 }
 
@@ -225,6 +245,9 @@ function partidaGrupoHtml(grupoIdx, partida) {
   const jogada = partida.golsCasa != null && partida.golsFora != null;
   return `
     <div class="partida">
+      <span class="data-partida">
+        📅 <input type="datetime-local" class="in-data-grupo" data-grupo="${grupoIdx}" data-partida="${partida.id}" value="${paraInputData(partida.data)}">
+      </span>
       <span class="time">${esc(partida.casa)}</span>
       <span class="placar">
         <input type="number" min="0" class="in-gol-casa" data-partida="${partida.id}" value="${partida.golsCasa ?? ''}">
@@ -281,9 +304,16 @@ function confrontoMMHtml(rodadaIdx, partidaIdx, partida) {
   const aguardandoTime = !partida.casa || !partida.fora;
   const aguardandoPenalti = pendentePenalti && pendentePenalti.rodadaIdx === rodadaIdx && pendentePenalti.partidaIdx === partidaIdx;
 
+  const dataHtml = `
+    <div class="data-partida">
+      📅 <input type="datetime-local" class="in-data-mm" data-rodada="${rodadaIdx}" data-idx="${partidaIdx}" value="${paraInputData(partida.data)}">
+    </div>
+  `;
+
   if (aguardandoTime) {
     return `
       <div class="confronto">
+        ${dataHtml}
         <div class="time-linha"><span class="nome">${partida.casa ? esc(partida.casa) : 'A definir'}</span></div>
         <div class="time-linha"><span class="nome">${partida.fora ? esc(partida.fora) : 'A definir'}</span></div>
         <div class="aguardando">Aguardando rodada anterior</div>
@@ -294,6 +324,7 @@ function confrontoMMHtml(rodadaIdx, partidaIdx, partida) {
   if (decidido) {
     return `
       <div class="confronto">
+        ${dataHtml}
         <div class="time-linha ${partida.vencedor === partida.casa ? 'vencedor' : ''}">
           <span class="nome">${esc(partida.casa)}</span><span>${partida.golsCasa}</span>
         </div>
@@ -307,6 +338,7 @@ function confrontoMMHtml(rodadaIdx, partidaIdx, partida) {
 
   return `
     <div class="confronto">
+      ${dataHtml}
       <div class="time-linha">
         <span class="nome">${esc(partida.casa)}</span>
         <input type="number" min="0" class="in-mm-casa" data-rodada="${rodadaIdx}" data-idx="${partidaIdx}" value="${partida.golsCasa ?? ''}">
@@ -398,6 +430,14 @@ document.getElementById('abas').addEventListener('click', (e) => {
   if (btn) mudarAba(btn.dataset.aba);
 });
 document.getElementById('btnReiniciar').addEventListener('click', reiniciarTorneio);
+
+app.addEventListener('change', (e) => {
+  if (e.target.matches('.in-data-grupo')) {
+    salvarDataGrupo(Number(e.target.dataset.grupo), e.target.dataset.partida, e.target.value || null);
+  } else if (e.target.matches('.in-data-mm')) {
+    salvarDataMM(Number(e.target.dataset.rodada), Number(e.target.dataset.idx), e.target.value || null);
+  }
+});
 
 carregarDoServidor({ inicial: true });
 
