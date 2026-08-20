@@ -1173,6 +1173,15 @@ app.addEventListener('scroll', (e) => {
   }
 }, true);
 
+// Assim que a pessoa toca/clica em qualquer lugar fora do chaveamento rolado, entende que
+// ela já saiu dali e libera a atualização na hora — sem precisar esperar ela rolar de volta.
+document.addEventListener('pointerdown', (e) => {
+  const bracket = document.querySelector('.bracket');
+  if (bracket && bracket.scrollLeft > 0 && !bracket.contains(e.target)) {
+    render();
+  }
+});
+
 // Avança o carrossel de patrocinadores sozinho, mexendo só na imagem (sem re-renderizar
 // a página inteira, pra não interromper quem estiver digitando em outro campo).
 setInterval(() => {
