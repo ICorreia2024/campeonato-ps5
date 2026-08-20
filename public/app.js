@@ -1135,9 +1135,18 @@ function haRascunhoNaoSalvo() {
   return false;
 }
 
+function chaveamentoRolado() {
+  // Enquanto a pessoa tiver rolado o chaveamento pra ver outras rodadas (ex.: disputa de
+  // 3º lugar), pausa a atualização automática — senão ela recria a tela e volta a rolagem
+  // pro início. Assim que a pessoa mesma voltar pro início, a sincronização volta a valer.
+  const bracket = document.querySelector('.bracket');
+  return !!bracket && bracket.scrollLeft > 0;
+}
+
 function usuarioDigitando() {
   const el = document.activeElement;
   if (el && ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName)) return true;
+  if (chaveamentoRolado()) return true;
   return haRascunhoNaoSalvo();
 }
 
