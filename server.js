@@ -513,14 +513,14 @@ function calcularFinalistas() {
 }
 
 function calcularDestaques() {
-  // Fica visível e vai atualizando desde a primeira partida jogada, não só no final.
+  // Sempre visível, desde antes de qualquer partida — funciona como prévia dos troféus
+  // que serão premiados, preenchendo-se sozinho conforme os jogos acontecem.
   const partidas = [];
   estado.grupos.forEach((g) => g.partidas.forEach((p) => { if (p.golsCasa != null) partidas.push(p); }));
   if (estado.mataMata) {
     estado.mataMata.rounds.forEach((r) => r.forEach((p) => { if (p.golsCasa != null) partidas.push(p); }));
     if (estado.mataMata.terceiroLugar?.golsCasa != null) partidas.push(estado.mataMata.terceiroLugar);
   }
-  if (partidas.length === 0) return null;
 
   const stats = {};
   const pega = (nome) => (stats[nome] ??= { nome, gp: 0, gc: 0, v: 0, d: 0, e: 0, jogos: 0, wo: 0 });

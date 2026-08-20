@@ -19,6 +19,7 @@ let editandoParticipanteId = null;
 let jaSorteado = false;
 let notasAbertas = new Set();
 let mostrarFormSenha = false;
+let mostrarBannerParabens = false;
 let carrosselIndice = 0;
 let carrosselTickAcumulado = 0;
 let intervaloAtualizacao = null;
@@ -54,6 +55,7 @@ async function atualizarEstado(novoEstado, { silencioso } = {}) {
   estado = novoEstado;
   if (!eraCampeao && estado.campeao) {
     abaAtiva = 'campeao';
+    mostrarBannerParabens = true;
     toast(`🏆 ${estado.campeao} é o campeão!`, 'ok');
   }
   document.querySelectorAll('.aba-btn').forEach((b) => b.classList.toggle('ativa', b.dataset.aba === abaAtiva));
@@ -314,6 +316,7 @@ async function reiniciarTorneio() {
     editandoParticipanteId = null;
     jaSorteado = false;
     mostrarFormSenha = false;
+    mostrarBannerParabens = false;
     estado = null;
     abaAtiva = 'participantes';
     document.querySelectorAll('.aba-btn').forEach((b) => b.classList.toggle('ativa', b.dataset.aba === 'participantes'));
@@ -714,22 +717,21 @@ function confrontoMMHtml(rodadaIdx, partidaIdx, partida) {
   const aguardandoTime = !partida.casa || !partida.fora;
   const aguardandoPenalti = pendentePenalti && pendentePenalti.rodadaIdx === rodadaIdx && pendentePenalti.partidaIdx === partidaIdx;
 
-  const dataHtml = `
-    <div class="data-partida">
-      📅 <input type="datetime-local" class="in-data-mm" data-rodada="${rodadaIdx}" data-idx="${partidaIdx}" value="${paraInputData(partida.data)}">
-    </div>
-  `;
-
   if (aguardandoTime) {
     return `
-      <div class="confronto">
-        ${dataHtml}
+      <div class="confronto confronto-previa">
         <div class="time-linha"><span class="nome">${partida.casa ? esc(partida.casa) : 'A definir'}</span></div>
         <div class="time-linha"><span class="nome">${partida.fora ? esc(partida.fora) : 'A definir'}</span></div>
         <div class="aguardando">Aguardando rodada anterior</div>
       </div>
     `;
   }
+
+  const dataHtml = `
+    <div class="data-partida">
+      📅 <input type="datetime-local" class="in-data-mm" data-rodada="${rodadaIdx}" data-idx="${partidaIdx}" value="${paraInputData(partida.data)}">
+    </div>
+  `;
 
   if (decidido) {
     return `
@@ -771,6 +773,18 @@ function confrontoMMHtml(rodadaIdx, partidaIdx, partida) {
 
 function confrontoTerceiroLugarHtml(partida) {
   const decidido = !!partida.vencedor;
+  const aguardandoTime = !partida.casa || !partida.fora;
+
+  if (aguardandoTime) {
+    return `
+      <div class="confronto confronto-previa">
+        <div class="time-linha"><span class="nome">Perdedor Semifinal 1</span></div>
+        <div class="time-linha"><span class="nome">Perdedor Semifinal 2</span></div>
+        <div class="aguardando">Aguardando semifinal</div>
+      </div>
+    `;
+  }
+
   const dataHtml = `
     <div class="data-partida">
       📅 <input type="datetime-local" class="in-data-terceiro" value="${paraInputData(partida.data)}">
@@ -826,6 +840,17 @@ function confrontoPreviaHtml(par) {
   `;
 }
 
+function calcularRodadasCompletasMM() {
+  const totalRodadas = Math.round(Math.log2(estado.numGrupos)) + 1;
+  const rounds = estado.mataMata.rounds.map((r) => r);
+  let tamanho = rounds[rounds.length - 1].length;
+  while (rounds.length < totalRodadas) {
+    tamanho = tamanho / 2;
+    rounds.push(Array.from({ length: tamanho }, () => ({ casa: null, fora: null })));
+  }
+  return rounds;
+}
+
 function renderMataMata() {
   if (!estado.mataMata) {
     if (!estado.previaChaveamento) {
@@ -855,6 +880,10 @@ function renderMataMata() {
               </div>
             `;
           }).join('')}
+          <div class="rodada-col">
+            <h4>🥉 Disputa de 3º Lugar</h4>
+            ${confrontoTerceiroLugarHtml({ casa: null, fora: null })}
+          </div>
         </div>
       </div>
     `;
@@ -868,13 +897,15 @@ function renderMataMata() {
     </div>
   ` : '';
 
+  const rodadasCompletas = calcularRodadasCompletasMM();
+
   app.innerHTML = `
     ${bannerFinal}
     <div class="card" style="overflow:visible;">
       <h2>Fase Eliminatória</h2>
       <div class="bracket">
-        ${estado.mataMata.rounds.map((rodada, ri) => {
-          const ehUltima = ri === estado.mataMata.rounds.length - 1;
+        ${rodadasCompletas.map((rodada, ri) => {
+          const ehUltima = ri === rodadasCompletas.length - 1;
           let corpo;
           if (ehUltima) {
             corpo = rodada.map((p, pi) => confrontoMMHtml(ri, pi, p)).join('');
@@ -897,12 +928,10 @@ function renderMataMata() {
             </div>
           `;
         }).join('')}
-        ${estado.mataMata.terceiroLugar ? `
-          <div class="rodada-col">
-            <h4>🥉 Disputa de 3º Lugar</h4>
-            ${confrontoTerceiroLugarHtml(estado.mataMata.terceiroLugar)}
-          </div>
-        ` : ''}
+        <div class="rodada-col">
+          <h4>🥉 Disputa de 3º Lugar</h4>
+          ${confrontoTerceiroLugarHtml(estado.mataMata.terceiroLugar || { casa: null, fora: null })}
+        </div>
       </div>
     </div>
   `;
@@ -965,13 +994,15 @@ function patrocinadoresListaHtml() {
 function destaquesHtml() {
   const d = estado.destaques;
   if (!d) return '';
-  const trofeus = [];
-  if (d.artilheiro) trofeus.push({ icone: '⚽', titulo: 'Artilheiro', nome: d.artilheiro.nome, valor: `${d.artilheiro.gols} gol${d.artilheiro.gols > 1 ? 's' : ''}` });
-  if (d.muralha) trofeus.push({ icone: '🧱', titulo: 'Muralha', nome: d.muralha.nome, valor: `${d.muralha.sofridos} sofrido${d.muralha.sofridos !== 1 ? 's' : ''}` });
-  if (d.invenciveis.length) trofeus.push({ icone: '🔥', titulo: 'Invencível', nome: d.invenciveis.join(' e '), valor: 'nenhuma derrota' });
-  if (d.maisEmpates) trofeus.push({ icone: '🤝', titulo: 'Parceiro do Ano', nome: d.maisEmpates.nome, valor: `${d.maisEmpates.empates} empate${d.maisEmpates.empates > 1 ? 's' : ''}` });
-  if (d.goleada) trofeus.push({ icone: '🎯', titulo: 'Goleada do Torneio', nome: d.goleada.vencedor, valor: `${d.goleada.placar} sobre ${d.goleada.perdedor}` });
-  if (d.maisWO) trofeus.push({ icone: '🚩', titulo: 'Troféu W.O.', nome: d.maisWO.nome, valor: `${d.maisWO.vezes}x ausente` });
+
+  const trofeus = [
+    { icone: '⚽', titulo: 'Artilheiro', nome: d.artilheiro?.nome, valor: d.artilheiro ? `${d.artilheiro.gols} gol${d.artilheiro.gols > 1 ? 's' : ''}` : null },
+    { icone: '🧱', titulo: 'Muralha', nome: d.muralha?.nome, valor: d.muralha ? `${d.muralha.sofridos} sofrido${d.muralha.sofridos !== 1 ? 's' : ''}` : null },
+    { icone: '🔥', titulo: 'Invencível', nome: d.invenciveis.length ? d.invenciveis.join(' e ') : null, valor: d.invenciveis.length ? 'nenhuma derrota' : null },
+    { icone: '🤝', titulo: 'Parceiro do Ano', nome: d.maisEmpates?.nome, valor: d.maisEmpates ? `${d.maisEmpates.empates} empate${d.maisEmpates.empates > 1 ? 's' : ''}` : null },
+    { icone: '🎯', titulo: 'Goleada do Torneio', nome: d.goleada?.vencedor, valor: d.goleada ? `${d.goleada.placar} sobre ${d.goleada.perdedor}` : null },
+    { icone: '🚩', titulo: 'Troféu W.O.', nome: d.maisWO?.nome, valor: d.maisWO ? `${d.maisWO.vezes}x ausente` : null }
+  ];
 
   const nomePosicao = (nome) => (nome ? esc(nome) : 'A definir');
   const nomeTerceiro = !d.podio.terceiro
@@ -987,42 +1018,51 @@ function destaquesHtml() {
         ${!d.torneioFinalizado ? '<span class="selo-ao-vivo">atualizando</span>' : ''}
       </h3>
       <div class="podio-destaques">
-        <div class="posicao-podio posicao-2">
-          <div class="medalha">🥈</div>
-          <div class="nome-posicao">${nomePosicao(d.podio.segundo)}</div>
-          <div class="rotulo-posicao">2º lugar</div>
+        <div class="passo-podio passo-2">
+          <div class="medalha-podio">🥈</div>
+          <div class="nome-podio">${nomePosicao(d.podio.segundo)}</div>
+          <div class="base-podio">2</div>
         </div>
-        <div class="posicao-podio posicao-1">
-          <div class="medalha">🥇</div>
-          <div class="nome-posicao">${nomePosicao(d.podio.primeiro)}</div>
-          <div class="rotulo-posicao">1º lugar</div>
+        <div class="passo-podio passo-1">
+          <div class="medalha-podio">🥇</div>
+          <div class="nome-podio">${nomePosicao(d.podio.primeiro)}</div>
+          <div class="base-podio">1</div>
         </div>
-        <div class="posicao-podio posicao-3">
-          <div class="medalha">🥉</div>
-          <div class="nome-posicao">${nomeTerceiro}</div>
-          <div class="rotulo-posicao">3º lugar</div>
+        <div class="passo-podio passo-3">
+          <div class="medalha-podio">🥉</div>
+          <div class="nome-podio">${nomeTerceiro}</div>
+          <div class="base-podio">3</div>
         </div>
       </div>
-      ${trofeus.length ? `
-        <div class="grade-trofeus">
-          ${trofeus.map((t) => `
-            <div class="cartao-trofeu">
-              <div class="icone-trofeu">${t.icone}</div>
-              <div class="titulo-trofeu">${t.titulo}</div>
-              <div class="nome-trofeu">${esc(t.nome)}</div>
-              <div class="valor-trofeu">${esc(t.valor)}</div>
-            </div>
-          `).join('')}
-        </div>
-      ` : ''}
+      <div class="grade-trofeus">
+        ${trofeus.map((t) => `
+          <div class="cartao-trofeu ${t.nome ? '' : 'cartao-trofeu-vazio'}">
+            <div class="icone-trofeu">${t.icone}</div>
+            <div class="titulo-trofeu">${t.titulo}</div>
+            <div class="nome-trofeu">${t.nome ? esc(t.nome) : '—'}</div>
+            <div class="valor-trofeu">${t.valor ? esc(t.valor) : 'Em aberto'}</div>
+          </div>
+        `).join('')}
+      </div>
     </div>
   `;
+}
+
+function confetesHtml(qtd) {
+  const confetesEmoji = ['🎉', '⚽', '🎊', '🏅', '✨'];
+  return Array.from({ length: qtd }, (_, i) => {
+    const esquerda = Math.round(Math.random() * 96);
+    const atraso = (Math.random() * 3).toFixed(2);
+    const emoji = confetesEmoji[i % confetesEmoji.length];
+    return `<span class="confete" style="left:${esquerda}%; animation-delay:${atraso}s;">${emoji}</span>`;
+  }).join('');
 }
 
 function renderCampeao() {
   if (!estado.campeao) {
     app.innerHTML = `
       <div class="card"><div class="vazio">O campeão será revelado aqui automaticamente ao final da fase eliminatória.</div></div>
+      ${destaquesHtml()}
       ${patrocinadoresListaHtml()}
       <div class="rodape">
         <button id="btnReiniciar" class="btn btn-perigo btn-pequeno">Reiniciar torneio</button>
@@ -1031,17 +1071,28 @@ function renderCampeao() {
     document.getElementById('btnReiniciar').addEventListener('click', reiniciarTorneio);
     return;
   }
-  const confetesEmoji = ['🎉', '⚽', '🎊', '🏅', '✨'];
-  const confetes = Array.from({ length: 18 }, (_, i) => {
-    const esquerda = Math.round(Math.random() * 96);
-    const atraso = (Math.random() * 3).toFixed(2);
-    const emoji = confetesEmoji[i % confetesEmoji.length];
-    return `<span class="confete" style="left:${esquerda}%; animation-delay:${atraso}s;">${emoji}</span>`;
-  }).join('');
+
+  if (mostrarBannerParabens) {
+    app.innerHTML = `
+      <div class="banner-parabens">
+        ${confetesHtml(24)}
+        <div class="taca-parabens">🏆</div>
+        <h1 class="titulo-parabens">PARABÉNS!</h1>
+        <div class="nome-parabens">${esc(estado.campeao)}</div>
+        <div class="subtitulo-parabens">é o grande campeão do torneio!</div>
+        <button class="btn btn-ouro" id="btnFecharParabens">Ver resultado completo</button>
+      </div>
+    `;
+    document.getElementById('btnFecharParabens').addEventListener('click', () => {
+      mostrarBannerParabens = false;
+      render();
+    });
+    return;
+  }
 
   app.innerHTML = `
     <div class="pagina-campeao">
-      ${confetes}
+      ${confetesHtml(18)}
       <div class="taca">🏆</div>
       <h2>Campeão do torneio</h2>
       <div class="nome-campeao">${esc(estado.campeao)}</div>

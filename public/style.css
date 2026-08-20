@@ -118,28 +118,37 @@ body {
 @keyframes pulsar-ao-vivo { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
 .disputando { font-size: .65rem; color: var(--texto-suave); font-weight: 400; display: block; }
 
-.podio-destaques { display: flex; align-items: flex-end; justify-content: center; gap: 10px; margin-bottom: 20px; }
-.posicao-podio {
-  background: var(--card); border: 1px solid var(--borda); border-radius: 10px 10px 4px 4px;
-  padding: 12px 10px; text-align: center; box-shadow: var(--sombra); width: 110px;
+.podio-destaques { display: flex; align-items: flex-end; justify-content: center; gap: 4px; margin-bottom: 20px; }
+.passo-podio { display: flex; flex-direction: column; align-items: center; width: 108px; }
+.passo-podio.passo-1 { order: 2; }
+.passo-podio.passo-2 { order: 1; }
+.passo-podio.passo-3 { order: 3; }
+.medalha-podio { font-size: 1.7rem; }
+.passo-1 .medalha-podio { font-size: 2.2rem; }
+.nome-podio {
+  font-weight: 800; font-size: .82rem; margin: 4px 0 8px; text-align: center;
+  word-break: break-word; min-height: 2.2em; display: flex; align-items: flex-end;
 }
-.posicao-podio .medalha { font-size: 1.6rem; }
-.posicao-podio .nome-posicao { font-weight: 800; font-size: .85rem; margin: 4px 0 2px; word-break: break-word; }
-.posicao-podio .rotulo-posicao { font-size: .68rem; color: var(--texto-suave); text-transform: uppercase; letter-spacing: .04em; }
-.posicao-podio.posicao-1 { padding-top: 20px; padding-bottom: 22px; border-color: var(--ouro); order: 2; }
-.posicao-podio.posicao-2 { padding-bottom: 14px; order: 1; }
-.posicao-podio.posicao-3 { padding-bottom: 8px; order: 3; }
-.posicao-podio.posicao-1 .medalha { font-size: 2.1rem; }
+.base-podio {
+  width: 100%; display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 10px; font-weight: 900; border-radius: 8px 8px 0 0; color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,.25); box-shadow: var(--sombra);
+}
+.passo-1 .base-podio { height: 96px; font-size: 1.7rem; background: linear-gradient(180deg, var(--ouro-claro), var(--ouro)); }
+.passo-2 .base-podio { height: 72px; font-size: 1.4rem; background: linear-gradient(180deg, #ececec, #b9b9b9); }
+.passo-3 .base-podio { height: 52px; font-size: 1.4rem; background: linear-gradient(180deg, #dba572, #a3703c); }
 
 .grade-trofeus { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
 .cartao-trofeu {
   background: var(--card); border: 1px solid var(--borda); border-radius: 10px;
   padding: 12px 10px; text-align: center; box-shadow: var(--sombra);
 }
+.cartao-trofeu-vazio { opacity: .55; }
 .cartao-trofeu .icone-trofeu { font-size: 1.5rem; }
 .cartao-trofeu .titulo-trofeu { font-size: .7rem; color: var(--texto-suave); text-transform: uppercase; letter-spacing: .03em; margin-top: 4px; }
 .cartao-trofeu .nome-trofeu { font-weight: 800; font-size: .88rem; margin: 3px 0 2px; word-break: break-word; }
 .cartao-trofeu .valor-trofeu { font-size: .74rem; color: var(--gramado); font-weight: 600; }
+.cartao-trofeu-vazio .valor-trofeu { color: var(--texto-suave); font-weight: 400; font-style: italic; }
 
 .secao-patrocinadores-campeao { text-align: center; margin: 20px 0; }
 .titulo-patrocinadores { color: var(--verde); letter-spacing: .08em; font-size: .8rem; margin-bottom: 12px; }
@@ -323,6 +332,23 @@ table.classificacao tr.classifica td:first-child { border-left: 3px solid var(--
 .confete { position: absolute; top: -10px; font-size: 1.2rem; animation: cair 3.4s linear infinite; opacity: .9; }
 @keyframes brilho { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
 @keyframes cair { from { transform: translateY(-20px) rotate(0deg); } to { transform: translateY(420px) rotate(360deg); } }
+
+.banner-parabens {
+  position: fixed; inset: 0; z-index: 200;
+  background: radial-gradient(circle at center, #1a5c34, #051911 78%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 24px; overflow: hidden;
+}
+.banner-parabens .taca-parabens { font-size: 5.5rem; filter: drop-shadow(0 0 30px var(--ouro)); animation: brilho 1.8s ease-in-out infinite; }
+.banner-parabens .titulo-parabens {
+  color: var(--ouro-claro); font-size: 2rem; letter-spacing: .12em; margin: 14px 0 2px;
+  text-shadow: 0 0 20px rgba(212, 175, 55, .7); font-weight: 900;
+}
+.banner-parabens .nome-parabens {
+  color: #fff; font-size: 2.5rem; font-weight: 900; margin: 8px 0; word-break: break-word;
+  text-shadow: 0 0 24px rgba(255, 255, 255, .45);
+}
+.banner-parabens .subtitulo-parabens { color: #cfe6d7; font-size: 1.05rem; margin-bottom: 30px; }
 
 #toast {
   display: none; position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
