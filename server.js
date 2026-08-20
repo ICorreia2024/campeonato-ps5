@@ -30,6 +30,7 @@ function estadoPadrao() {
     faseGruposGerada: false,
     participantes: [],
     patrocinadores: [],
+    carrosselIntervalo: 4,
     grupos: [],
     mataMata: null,
     campeao: null
@@ -213,6 +214,7 @@ function montarEstadoPublico() {
     primeiraPartidaComecou: algumaPartidaJogada(),
     participantes: participantesComGrupo,
     patrocinadores: estado.patrocinadores,
+    carrosselIntervalo: estado.carrosselIntervalo,
     campeao: estado.campeao,
     finalistas: calcularFinalistas(),
     gruposPorTime: estado.faseGruposGerada ? null : participantesPorGrupo(),
@@ -234,19 +236,34 @@ class ErroApi extends Error {
   constructor(mensagem, status = 400) { super(mensagem); this.status = status; }
 }
 
-function acaoAdicionarPatrocinador({ nome }) {
+const TAMANHO_MAX_IMAGEM_BASE64 = 1_400_000; // ~1MB de imagem binária
+
+function acaoAdicionarPatrocinador({ nome, imagem }) {
   const limpo = String(nome || '').trim();
   if (!limpo) throw new ErroApi('Informe um nome.');
+  if (!imagem || !/^data:image\/(png|jpe?g|webp|gif|svg\+xml);base64,/.test(imagem)) {
+    throw new ErroApi('Envie uma imagem para o patrocinador.');
+  }
+  if (imagem.length > TAMANHO_MAX_IMAGEM_BASE64) {
+    throw new ErroApi('Imagem muito grande. Envie um arquivo de até ~1MB.');
+  }
   if (estado.faseGruposGerada) throw new ErroApi('A fase de grupos já foi gerada — os patrocinadores não podem mais ser alterados.');
   if (estado.patrocinadores.some((s) => s.nome.toLowerCase() === limpo.toLowerCase())) {
     throw new ErroApi('Esse patrocinador já foi adicionado.');
   }
-  estado.patrocinadores.push({ id: uid(), nome: limpo });
+  estado.patrocinadores.push({ id: uid(), nome: limpo, imagem });
 }
 
 function acaoRemoverPatrocinador(id) {
   if (estado.faseGruposGerada) throw new ErroApi('A fase de grupos já foi gerada — os patrocinadores não podem mais ser alterados.');
   estado.patrocinadores = estado.patrocinadores.filter((s) => s.id !== id);
+}
+
+function acaoDefinirCarrosselIntervalo({ segundos }) {
+  if (estado.faseGruposGerada) throw new ErroApi('A fase de grupos já foi gerada.');
+  const n = Number(segundos);
+  if (!Number.isInteger(n) || n < 1 || n > 30) throw new ErroApi('Informe um intervalo entre 1 e 30 segundos.');
+  estado.carrosselIntervalo = n;
 }
 
 function acaoAdicionarParticipante({ nome }) {
@@ -450,7 +467,7 @@ function lerCorpo(req) {
     let dados = '';
     req.on('data', (chunk) => {
       dados += chunk;
-      if (dados.length > 1e6) req.destroy();
+      if (dados.length > 2_000_000) req.destroy();
     });
     req.on('end', () => {
       if (!dados) return resolve({});
@@ -500,6 +517,13 @@ const servidor = http.createServer(async (req, res) => {
     // DELETE /api/patrocinadores/:id
     if (req.method === 'DELETE' && partes[1] === 'patrocinadores' && partes.length === 3) {
       acaoRemoverPatrocinador(partes[2]);
+      await salvarEstado();
+      return enviarJson(res, 200, montarEstadoPublico());
+    }
+
+    // POST /api/config-carrossel
+    if (req.method === 'POST' && partes[1] === 'config-carrossel') {
+      acaoDefinirCarrosselIntervalo(await lerCorpo(req));
       await salvarEstado();
       return enviarJson(res, 200, montarEstadoPublico());
     }

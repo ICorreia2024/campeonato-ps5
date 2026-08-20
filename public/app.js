@@ -17,6 +17,8 @@ let pendentePenalti = null; // { rodadaIdx, partidaIdx }
 let editandoParticipanteId = null;
 let jaSorteado = false;
 let notasAbertas = new Set();
+let carrosselIndice = 0;
+let carrosselTickAcumulado = 0;
 let intervaloAtualizacao = null;
 
 let toastTimer;
@@ -72,18 +74,40 @@ async function adicionarParticipante(nome) {
   } catch (e) { toast(e.message, 'erro'); }
 }
 
-async function adicionarPatrocinador(nome) {
+function lerArquivoComoDataUrl(arquivo) {
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader();
+    leitor.onload = () => resolve(leitor.result);
+    leitor.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
+    leitor.readAsDataURL(arquivo);
+  });
+}
+
+const TAMANHO_MAX_ARQUIVO_IMAGEM = 1_000_000; // ~1MB
+
+async function adicionarPatrocinador(nome, arquivo) {
   const limpo = nome.trim();
-  if (!limpo) return;
+  if (!limpo) { toast('Informe o nome do patrocinador.', 'erro'); return; }
+  if (!arquivo) { toast('Selecione uma imagem para o patrocinador.', 'erro'); return; }
+  if (arquivo.size > TAMANHO_MAX_ARQUIVO_IMAGEM) { toast('Imagem muito grande. Envie um arquivo de até 1MB.', 'erro'); return; }
   try {
-    const dados = await api('/api/patrocinadores', 'POST', { nome: limpo });
+    const imagem = await lerArquivoComoDataUrl(arquivo);
+    const dados = await api('/api/patrocinadores', 'POST', { nome: limpo, imagem });
     await atualizarEstado(dados);
+    toast('Patrocinador adicionado!', 'ok');
   } catch (e) { toast(e.message, 'erro'); }
 }
 
 async function removerPatrocinador(id) {
   try {
     const dados = await api(`/api/patrocinadores/${id}`, 'DELETE');
+    await atualizarEstado(dados);
+  } catch (e) { toast(e.message, 'erro'); }
+}
+
+async function definirCarrosselIntervalo(segundos) {
+  try {
+    const dados = await api('/api/config-carrossel', 'POST', { segundos });
     await atualizarEstado(dados);
   } catch (e) { toast(e.message, 'erro'); }
 }
@@ -223,6 +247,25 @@ function botaoNotaHtml(chave) {
   return `<button type="button" class="btn-nota" data-acao="toggle-nota" data-chave="${chave}" title="Mostrar/ocultar explicação">ℹ️</button>`;
 }
 
+function carrosselHtml(lista) {
+  if (lista.length === 0) return '';
+  const indiceAtual = carrosselIndice % lista.length;
+  const atual = lista[indiceAtual];
+  return `
+    <div class="carrossel-patrocinadores">
+      <div class="carrossel-frame">
+        <img id="carrossel-img" src="${atual.imagem}" alt="${esc(atual.nome)}">
+      </div>
+      <div class="carrossel-legenda" id="carrossel-nome">${esc(atual.nome)}</div>
+      ${lista.length > 1 ? `
+        <div class="carrossel-dots" id="carrossel-dots">
+          ${lista.map((_, i) => `<span class="dot ${i === indiceAtual ? 'ativo' : ''}"></span>`).join('')}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
 function secaoPatrocinadoresHtml() {
   const podeEditar = !estado.faseGruposGerada;
   const lista = estado.patrocinadores || [];
@@ -231,23 +274,29 @@ function secaoPatrocinadoresHtml() {
     <div class="card">
       <h2>Patrocinadores</h2>
       ${podeEditar ? `
-        <div class="linha-form">
+        <p class="texto-explicativo">Tamanho recomendado da imagem: <strong>320×160px</strong> (proporção 2:1). Qualquer tamanho é aceito e ajustado automaticamente, até 1MB por arquivo.</p>
+        <div class="linha-form linha-form-patrocinador">
           <input type="text" id="inNomePatrocinador" placeholder="Nome do patrocinador" maxlength="40">
+          <input type="file" id="inImagemPatrocinador" accept="image/*">
           <button class="btn" id="btnAddPatrocinador">Adicionar</button>
         </div>
-      ` : ''}
-      ${lista.length === 0
-        ? (podeEditar ? '<div class="vazio">Nenhum patrocinador adicionado.</div>' : '')
-        : `
+        <div class="linha-form">
+          <label for="inIntervaloCarrossel" class="rotulo-inline">Intervalo do carrossel:</label>
+          <input type="number" id="inIntervaloCarrossel" min="1" max="30" value="${estado.carrosselIntervalo}" style="width:70px;">
+          <span class="rotulo-inline">segundos</span>
+        </div>
+        ${lista.length === 0 ? '<div class="vazio">Nenhum patrocinador adicionado.</div>' : `
           <ul class="lista-participantes">
             ${lista.map((s) => `
               <li>
-                <span>${esc(s.nome)}</span>
-                ${podeEditar ? `<button class="btn-x" data-acao="remover-patrocinador" data-id="${s.id}" title="Remover">✕</button>` : ''}
+                <span class="item-patrocinador"><img class="miniatura-patrocinador" src="${s.imagem}" alt=""> ${esc(s.nome)}</span>
+                <button class="btn-x" data-acao="remover-patrocinador" data-id="${s.id}" title="Remover">✕</button>
               </li>
             `).join('')}
           </ul>
         `}
+      ` : ''}
+      ${carrosselHtml(lista)}
     </div>
   `;
 }
@@ -369,14 +418,18 @@ function renderParticipantes() {
   app.querySelectorAll('[data-acao="toggle-nota"]').forEach((b) =>
     b.addEventListener('click', () => alternarNota(b.dataset.chave))
   );
-  document.getElementById('btnAddPatrocinador')?.addEventListener('click', () => {
-    const input = document.getElementById('inNomePatrocinador');
-    adicionarPatrocinador(input.value);
-    input.value = '';
-    input.focus();
+  document.getElementById('btnAddPatrocinador')?.addEventListener('click', async () => {
+    const inputNome = document.getElementById('inNomePatrocinador');
+    const inputImagem = document.getElementById('inImagemPatrocinador');
+    await adicionarPatrocinador(inputNome.value, inputImagem.files[0]);
+    inputNome.value = '';
+    inputImagem.value = '';
   });
   document.getElementById('inNomePatrocinador')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.getElementById('btnAddPatrocinador').click();
+  });
+  document.getElementById('inIntervaloCarrossel')?.addEventListener('change', (e) => {
+    definirCarrosselIntervalo(Number(e.target.value));
   });
   app.querySelectorAll('[data-acao="remover-patrocinador"]').forEach((b) =>
     b.addEventListener('click', () => removerPatrocinador(b.dataset.id))
@@ -610,17 +663,28 @@ function renderMataMata() {
   });
 }
 
-function patrocinadoresLinhaHtml() {
+function patrocinadoresListaHtml() {
   const lista = estado.patrocinadores || [];
   if (lista.length === 0) return '';
-  return `<div class="linha-patrocinadores">Patrocinado por: ${lista.map((s) => esc(s.nome)).join(' · ')}</div>`;
+  return `
+    <div class="secao-patrocinadores-campeao">
+      <h3 class="titulo-patrocinadores">PATROCINADORES</h3>
+      <div class="lista-patrocinadores-estatica">
+        ${lista.map((s) => `
+          <div class="patrocinador-estatico">
+            <img src="${s.imagem}" alt="${esc(s.nome)}">
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
 }
 
 function renderCampeao() {
   if (!estado.campeao) {
     app.innerHTML = `
       <div class="card"><div class="vazio">O campeão será revelado aqui automaticamente ao final da fase eliminatória.</div></div>
-      ${patrocinadoresLinhaHtml()}
+      ${patrocinadoresListaHtml()}
       <div class="rodape">
         <button id="btnReiniciar" class="btn btn-perigo btn-pequeno">Reiniciar torneio</button>
       </div>
@@ -644,7 +708,7 @@ function renderCampeao() {
       <div class="nome-campeao">${esc(estado.campeao)}</div>
       <div class="subtitulo">EA Sports FC 26 — PS5</div>
     </div>
-    ${patrocinadoresLinhaHtml()}
+    ${patrocinadoresListaHtml()}
     <div class="rodape">
       <button id="btnReiniciar" class="btn btn-perigo btn-pequeno">Reiniciar torneio</button>
     </div>
@@ -679,3 +743,26 @@ intervaloAtualizacao = setInterval(() => {
   if (usuarioDigitando()) return;
   carregarDoServidor();
 }, 5000);
+
+// Avança o carrossel de patrocinadores sozinho, mexendo só na imagem (sem re-renderizar
+// a página inteira, pra não interromper quem estiver digitando em outro campo).
+setInterval(() => {
+  const img = document.getElementById('carrossel-img');
+  if (!img || !estado) return;
+  const lista = estado.patrocinadores || [];
+  if (lista.length < 2) return;
+  const intervalo = estado.carrosselIntervalo || 4;
+  carrosselTickAcumulado++;
+  if (carrosselTickAcumulado < intervalo) return;
+  carrosselTickAcumulado = 0;
+  carrosselIndice = (carrosselIndice + 1) % lista.length;
+  const atual = lista[carrosselIndice];
+  img.src = atual.imagem;
+  img.alt = atual.nome;
+  const legenda = document.getElementById('carrossel-nome');
+  if (legenda) legenda.textContent = atual.nome;
+  const dots = document.getElementById('carrossel-dots');
+  if (dots) {
+    dots.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('ativo', i === carrosselIndice));
+  }
+}, 1000);

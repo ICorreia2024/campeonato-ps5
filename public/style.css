@@ -84,9 +84,36 @@ body {
 }
 .btn-nota:hover { opacity: 1; background: #eef2ef; }
 
-.linha-patrocinadores {
-  text-align: center; font-size: .8rem; color: var(--texto-suave); margin: -6px 0 14px;
+.linha-form-patrocinador input[type="file"] { flex: 1; min-width: 160px; font-size: .82rem; }
+.rotulo-inline { font-size: .88rem; color: var(--texto-suave); }
+
+.item-patrocinador { display: flex; align-items: center; gap: 8px; }
+.miniatura-patrocinador {
+  width: 40px; height: 24px; object-fit: contain; background: #fff;
+  border: 1px solid var(--borda); border-radius: 4px; flex-shrink: 0;
 }
+
+.carrossel-patrocinadores { display: flex; flex-direction: column; align-items: center; margin-top: 16px; }
+.carrossel-frame {
+  width: 320px; height: 160px; max-width: 100%; background: #fff; border: 1px solid var(--borda);
+  border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; box-shadow: var(--sombra);
+}
+.carrossel-frame img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.carrossel-legenda { margin-top: 8px; font-size: .85rem; font-weight: 600; color: var(--verde); }
+.carrossel-dots { display: flex; gap: 6px; margin-top: 8px; }
+.carrossel-dots .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--borda); transition: background .2s; }
+.carrossel-dots .dot.ativo { background: var(--gramado); }
+
+.secao-patrocinadores-campeao { text-align: center; margin: 20px 0; }
+.titulo-patrocinadores { color: var(--verde); letter-spacing: .08em; font-size: .8rem; margin-bottom: 12px; }
+.lista-patrocinadores-estatica { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.patrocinador-estatico {
+  width: 320px; max-width: 90%; height: 160px; background: #fff; border: 1px solid var(--borda);
+  border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; box-shadow: var(--sombra);
+}
+.patrocinador-estatico img { max-width: 100%; max-height: 100%; object-fit: contain; }
 
 .linha-form { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
 input[type="text"], input[type="number"], select {
