@@ -42,6 +42,13 @@ function hashSenha(senha) {
   return crypto.createHash('sha256').update(String(senha)).digest('hex');
 }
 
+function verificarSenha(senha) {
+  if (!estado.senhaHash) return; // torneio sem senha configurada
+  if (!senha || hashSenha(senha) !== estado.senhaHash) {
+    throw new ErroApi('Senha incorreta.', 403);
+  }
+}
+
 async function carregarEstado() {
   if (USAR_SUPABASE) {
     try {
@@ -302,10 +309,11 @@ function acaoAdicionarParticipante({ nome }) {
   }
 }
 
-function acaoRemoverParticipante(id) {
+function acaoRemoverParticipante(id, senha) {
   if (algumaPartidaJogada()) throw new ErroApi('O torneio já começou — não é mais possível remover participantes.');
   const participante = estado.participantes.find((p) => p.id === id);
   if (!participante) throw new ErroApi('Participante não encontrado.', 404);
+  verificarSenha(senha);
   estado.participantes = estado.participantes.filter((p) => p.id !== id);
   if (estado.faseGruposGerada) {
     const grupo = estado.grupos.find((g) => g.times.includes(participante.nome));
@@ -367,7 +375,7 @@ function acaoIniciarFaseDeGrupos() {
   estado.faseGruposGerada = true;
 }
 
-function acaoSalvarPlacarGrupo(grupoIdx, partidaId, golsCasa, golsFora) {
+function acaoSalvarPlacarGrupo(grupoIdx, partidaId, golsCasa, golsFora, senha) {
   const grupo = estado.grupos[grupoIdx];
   if (!grupo) throw new ErroApi('Grupo não encontrado.', 404);
   const partida = grupo.partidas.find((p) => p.id === partidaId);
@@ -375,6 +383,10 @@ function acaoSalvarPlacarGrupo(grupoIdx, partidaId, golsCasa, golsFora) {
   if (!Number.isInteger(golsCasa) || !Number.isInteger(golsFora) || golsCasa < 0 || golsFora < 0) {
     throw new ErroApi('Placar inválido.');
   }
+  // Corrigir um placar já lançado exige a senha; o primeiro lançamento não.
+  const jaTinhaPlacar = partida.golsCasa != null || partida.golsFora != null;
+  if (jaTinhaPlacar) verificarSenha(senha);
+
   partida.golsCasa = golsCasa;
   partida.golsFora = golsFora;
 
@@ -406,7 +418,7 @@ function acaoSalvarDataMataMata(rodadaIdx, partidaIdx, data) {
   partida.data = normalizarData(data);
 }
 
-function acaoSalvarPlacarMataMata(rodadaIdx, partidaIdx, golsCasa, golsFora, penVencedor) {
+function acaoSalvarPlacarMataMata(rodadaIdx, partidaIdx, golsCasa, golsFora, penVencedor, senha) {
   if (!estado.mataMata) throw new ErroApi('Mata-mata ainda não foi gerado.', 404);
   const rodada = estado.mataMata.rounds[rodadaIdx];
   const partida = rodada && rodada[partidaIdx];
@@ -415,6 +427,9 @@ function acaoSalvarPlacarMataMata(rodadaIdx, partidaIdx, golsCasa, golsFora, pen
   if (!Number.isInteger(golsCasa) || !Number.isInteger(golsFora) || golsCasa < 0 || golsFora < 0) {
     throw new ErroApi('Placar inválido.');
   }
+  // Mudar o resultado de um confronto já decidido exige a senha (a etapa de escolher o
+  // vencedor nos pênaltis não conta como "já decidido", pois o vencedor ainda está null).
+  if (partida.vencedor) verificarSenha(senha);
 
   partida.golsCasa = golsCasa;
   partida.golsFora = golsFora;
@@ -573,7 +588,8 @@ const servidor = http.createServer(async (req, res) => {
 
     // DELETE /api/participantes/:id
     if (req.method === 'DELETE' && partes[1] === 'participantes' && partes.length === 3) {
-      acaoRemoverParticipante(partes[2]);
+      const corpo = await lerCorpo(req);
+      acaoRemoverParticipante(partes[2], corpo.senha);
       await salvarEstado();
       return enviarJson(res, 200, montarEstadoPublico());
     }
@@ -610,7 +626,7 @@ const servidor = http.createServer(async (req, res) => {
     // POST /api/grupos/:grupoIdx/:partidaId/placar
     if (req.method === 'POST' && partes[1] === 'grupos' && partes[4] === 'placar') {
       const corpo = await lerCorpo(req);
-      acaoSalvarPlacarGrupo(Number(partes[2]), partes[3], Number(corpo.golsCasa), Number(corpo.golsFora));
+      acaoSalvarPlacarGrupo(Number(partes[2]), partes[3], Number(corpo.golsCasa), Number(corpo.golsFora), corpo.senha);
       await salvarEstado();
       return enviarJson(res, 200, montarEstadoPublico());
     }
@@ -635,7 +651,7 @@ const servidor = http.createServer(async (req, res) => {
     if (req.method === 'POST' && partes[1] === 'mata-mata' && partes[4] === 'placar') {
       const corpo = await lerCorpo(req);
       const resultado = acaoSalvarPlacarMataMata(
-        Number(partes[2]), Number(partes[3]), Number(corpo.golsCasa), Number(corpo.golsFora), corpo.penVencedor || null
+        Number(partes[2]), Number(partes[3]), Number(corpo.golsCasa), Number(corpo.golsFora), corpo.penVencedor || null, corpo.senha
       );
       await salvarEstado();
       return enviarJson(res, 200, { ...montarEstadoPublico(), ...resultado });

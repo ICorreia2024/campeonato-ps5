@@ -41,6 +41,13 @@ async function api(caminho, metodo = 'GET', corpo) {
   return dados;
 }
 
+function pedirSenhaSeNecessario(precisa) {
+  if (!precisa || !estado.temSenha) return { ok: true, senha: null };
+  const senha = prompt('Essa ação exige a senha do torneio:');
+  if (senha === null) return { ok: false, senha: null };
+  return { ok: true, senha };
+}
+
 async function atualizarEstado(novoEstado, { silencioso } = {}) {
   const eraCampeao = estado?.campeao;
   estado = novoEstado;
@@ -168,8 +175,10 @@ async function definirCarrosselIntervalo(segundos) {
 
 async function removerParticipante(id) {
   if (!confirm('Remover este participante?')) return;
+  const { ok, senha } = pedirSenhaSeNecessario(true);
+  if (!ok) return;
   try {
-    const dados = await api(`/api/participantes/${id}`, 'DELETE');
+    const dados = await api(`/api/participantes/${id}`, 'DELETE', { senha });
     await atualizarEstado(dados);
   } catch (e) { toast(e.message, 'erro'); }
 }
@@ -223,8 +232,12 @@ async function iniciarFaseDeGrupos() {
 }
 
 async function salvarPlacarGrupo(grupoIdx, partidaId, golsCasa, golsFora) {
+  const partidaAtual = estado.grupos[grupoIdx]?.partidas.find((p) => p.id === partidaId);
+  const jaTinhaPlacar = !!partidaAtual && (partidaAtual.golsCasa != null || partidaAtual.golsFora != null);
+  const { ok, senha } = pedirSenhaSeNecessario(jaTinhaPlacar);
+  if (!ok) return;
   try {
-    const dados = await api(`/api/grupos/${grupoIdx}/${partidaId}/placar`, 'POST', { golsCasa, golsFora });
+    const dados = await api(`/api/grupos/${grupoIdx}/${partidaId}/placar`, 'POST', { golsCasa, golsFora, senha });
     const gerouMataMata = !estado.mataMata && dados.mataMata;
     await atualizarEstado(dados);
     if (gerouMataMata) toast('Fase de grupos concluída! Mata-mata gerado.', 'ok');
@@ -232,8 +245,12 @@ async function salvarPlacarGrupo(grupoIdx, partidaId, golsCasa, golsFora) {
 }
 
 async function salvarPlacarMM(rodadaIdx, partidaIdx, golsCasa, golsFora, penVencedor) {
+  const partidaAtual = estado.mataMata?.rounds[rodadaIdx]?.[partidaIdx];
+  const jaDecidida = !!partidaAtual?.vencedor;
+  const { ok, senha } = pedirSenhaSeNecessario(jaDecidida);
+  if (!ok) return;
   try {
-    const dados = await api(`/api/mata-mata/${rodadaIdx}/${partidaIdx}/placar`, 'POST', { golsCasa, golsFora, penVencedor });
+    const dados = await api(`/api/mata-mata/${rodadaIdx}/${partidaIdx}/placar`, 'POST', { golsCasa, golsFora, penVencedor, senha });
     if (dados.aguardandoPenalti) {
       pendentePenalti = { rodadaIdx, partidaIdx };
     } else {
