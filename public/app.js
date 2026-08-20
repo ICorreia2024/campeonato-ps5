@@ -543,7 +543,11 @@ function renderCampeao() {
       <div class="nome-campeao">${esc(estado.campeao)}</div>
       <div class="subtitulo">EA Sports FC 26 — PS5</div>
     </div>
+    <div class="rodape">
+      <button id="btnReiniciar" class="btn btn-perigo btn-pequeno">Reiniciar torneio</button>
+    </div>
   `;
+  document.getElementById('btnReiniciar').addEventListener('click', reiniciarTorneio);
 }
 
 /* ============================ INICIALIZAÇÃO ============================ */
@@ -552,8 +556,6 @@ document.getElementById('abas').addEventListener('click', (e) => {
   const btn = e.target.closest('.aba-btn');
   if (btn) mudarAba(btn.dataset.aba);
 });
-document.getElementById('btnReiniciar').addEventListener('click', reiniciarTorneio);
-
 app.addEventListener('change', (e) => {
   if (e.target.matches('.in-data-grupo')) {
     salvarDataGrupo(Number(e.target.dataset.grupo), e.target.dataset.partida, e.target.value || null);
