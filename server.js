@@ -29,6 +29,7 @@ function estadoPadrao() {
     numGrupos: 2,
     faseGruposGerada: false,
     participantes: [],
+    patrocinadores: [],
     grupos: [],
     mataMata: null,
     campeao: null
@@ -211,6 +212,7 @@ function montarEstadoPublico() {
     faseGruposGerada: estado.faseGruposGerada,
     primeiraPartidaComecou: algumaPartidaJogada(),
     participantes: participantesComGrupo,
+    patrocinadores: estado.patrocinadores,
     campeao: estado.campeao,
     finalistas: calcularFinalistas(),
     gruposPorTime: estado.faseGruposGerada ? null : participantesPorGrupo(),
@@ -230,6 +232,21 @@ function montarEstadoPublico() {
 
 class ErroApi extends Error {
   constructor(mensagem, status = 400) { super(mensagem); this.status = status; }
+}
+
+function acaoAdicionarPatrocinador({ nome }) {
+  const limpo = String(nome || '').trim();
+  if (!limpo) throw new ErroApi('Informe um nome.');
+  if (estado.faseGruposGerada) throw new ErroApi('A fase de grupos já foi gerada — os patrocinadores não podem mais ser alterados.');
+  if (estado.patrocinadores.some((s) => s.nome.toLowerCase() === limpo.toLowerCase())) {
+    throw new ErroApi('Esse patrocinador já foi adicionado.');
+  }
+  estado.patrocinadores.push({ id: uid(), nome: limpo });
+}
+
+function acaoRemoverPatrocinador(id) {
+  if (estado.faseGruposGerada) throw new ErroApi('A fase de grupos já foi gerada — os patrocinadores não podem mais ser alterados.');
+  estado.patrocinadores = estado.patrocinadores.filter((s) => s.id !== id);
 }
 
 function acaoAdicionarParticipante({ nome }) {
@@ -460,6 +477,20 @@ const servidor = http.createServer(async (req, res) => {
   try {
     // GET /api/estado
     if (req.method === 'GET' && partes[1] === 'estado') {
+      return enviarJson(res, 200, montarEstadoPublico());
+    }
+
+    // POST /api/patrocinadores
+    if (req.method === 'POST' && partes[1] === 'patrocinadores' && partes.length === 2) {
+      acaoAdicionarPatrocinador(await lerCorpo(req));
+      await salvarEstado();
+      return enviarJson(res, 200, montarEstadoPublico());
+    }
+
+    // DELETE /api/patrocinadores/:id
+    if (req.method === 'DELETE' && partes[1] === 'patrocinadores' && partes.length === 3) {
+      acaoRemoverPatrocinador(partes[2]);
+      await salvarEstado();
       return enviarJson(res, 200, montarEstadoPublico());
     }
 

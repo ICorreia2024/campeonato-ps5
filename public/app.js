@@ -16,6 +16,7 @@ let abaAtiva = 'participantes';
 let pendentePenalti = null; // { rodadaIdx, partidaIdx }
 let editandoParticipanteId = null;
 let jaSorteado = false;
+let notasAbertas = new Set();
 let intervaloAtualizacao = null;
 
 let toastTimer;
@@ -67,6 +68,22 @@ async function adicionarParticipante(nome) {
   if (!limpo) return;
   try {
     const dados = await api('/api/participantes', 'POST', { nome: limpo });
+    await atualizarEstado(dados);
+  } catch (e) { toast(e.message, 'erro'); }
+}
+
+async function adicionarPatrocinador(nome) {
+  const limpo = nome.trim();
+  if (!limpo) return;
+  try {
+    const dados = await api('/api/patrocinadores', 'POST', { nome: limpo });
+    await atualizarEstado(dados);
+  } catch (e) { toast(e.message, 'erro'); }
+}
+
+async function removerPatrocinador(id) {
+  try {
+    const dados = await api(`/api/patrocinadores/${id}`, 'DELETE');
     await atualizarEstado(dados);
   } catch (e) { toast(e.message, 'erro'); }
 }
@@ -197,6 +214,45 @@ function render() {
   if (abaAtiva === 'campeao') return renderCampeao();
 }
 
+function alternarNota(chave) {
+  if (notasAbertas.has(chave)) notasAbertas.delete(chave); else notasAbertas.add(chave);
+  render();
+}
+
+function botaoNotaHtml(chave) {
+  return `<button type="button" class="btn-nota" data-acao="toggle-nota" data-chave="${chave}" title="Mostrar/ocultar explicação">ℹ️</button>`;
+}
+
+function secaoPatrocinadoresHtml() {
+  const podeEditar = !estado.faseGruposGerada;
+  const lista = estado.patrocinadores || [];
+  if (!podeEditar && lista.length === 0) return '';
+  return `
+    <div class="card">
+      <h2>Patrocinadores ${botaoNotaHtml('patrocinadores')}</h2>
+      ${notasAbertas.has('patrocinadores') ? '<p class="texto-explicativo">Os patrocinadores são indicados na criação do torneio e não podem mais ser alterados depois que a fase de grupos for gerada.</p>' : ''}
+      ${podeEditar ? `
+        <div class="linha-form">
+          <input type="text" id="inNomePatrocinador" placeholder="Nome do patrocinador" maxlength="40">
+          <button class="btn" id="btnAddPatrocinador">Adicionar</button>
+        </div>
+      ` : ''}
+      ${lista.length === 0
+        ? (podeEditar ? '<div class="vazio">Nenhum patrocinador adicionado.</div>' : '')
+        : `
+          <ul class="lista-participantes">
+            ${lista.map((s) => `
+              <li>
+                <span>${esc(s.nome)}</span>
+                ${podeEditar ? `<button class="btn-x" data-acao="remover-patrocinador" data-id="${s.id}" title="Remover">✕</button>` : ''}
+              </li>
+            `).join('')}
+          </ul>
+        `}
+    </div>
+  `;
+}
+
 function renderParticipantes() {
   const grupos = estado.gruposPorTime || [];
   const opcoesGrupo = [2, 4, 8].map((n) =>
@@ -204,21 +260,23 @@ function renderParticipantes() {
   ).join('');
 
   const podeEditarLista = !estado.primeiraPartidaComecou;
-  let avisoConfig = '';
+  let notaConfigTexto = '';
   if (estado.primeiraPartidaComecou) {
-    avisoConfig = '<div class="aviso">O torneio já começou. Não é mais possível alterar participantes nem a configuração — reinicie o torneio para começar do zero.</div>';
+    notaConfigTexto = 'O torneio já começou. Não é mais possível alterar participantes nem a configuração — reinicie o torneio para começar do zero.';
   } else if (estado.faseGruposGerada) {
-    avisoConfig = '<div class="aviso">Fase de grupos já gerada — não dá mais para mudar o número de grupos, mas você ainda pode adicionar, editar ou remover participantes até a primeira partida ser jogada. Quem for adicionado entra automaticamente no grupo com menos jogadores.</div>';
+    notaConfigTexto = 'Fase de grupos já gerada — não dá mais para mudar o número de grupos, mas você ainda pode adicionar, editar ou remover participantes até a primeira partida ser jogada. Quem for adicionado entra automaticamente no grupo com menos jogadores.';
   }
 
   app.innerHTML = `
     <div class="card">
-      <h2>1. Configuração</h2>
+      <h2>1. Configuração ${notaConfigTexto ? botaoNotaHtml('config') : ''}</h2>
+      ${notaConfigTexto && notasAbertas.has('config') ? `<div class="aviso">${notaConfigTexto}</div>` : ''}
       <div class="linha-form">
         <select id="selNumGrupos" ${estado.faseGruposGerada ? 'disabled' : ''}>${opcoesGrupo}</select>
       </div>
-      ${avisoConfig}
     </div>
+
+    ${secaoPatrocinadoresHtml()}
 
     <div class="card">
       <h2>2. Participantes <span class="selo">${estado.participantes.length} adicionados</span></h2>
@@ -260,8 +318,8 @@ function renderParticipantes() {
 
     ${!estado.faseGruposGerada ? `
       <div class="card">
-        <h2>3. Sorteio dos Grupos</h2>
-        <p class="texto-explicativo">Os grupos abaixo são montados por sorteio aleatório — sem escolha manual — pra garantir que ninguém possa favorecer um lado. Pode sortear de novo quantas vezes quiser antes de gerar a fase de grupos.</p>
+        <h2>3. Sorteio dos Grupos ${botaoNotaHtml('sorteio')}</h2>
+        ${notasAbertas.has('sorteio') ? '<p class="texto-explicativo">Os grupos abaixo são montados por sorteio aleatório — sem escolha manual — pra garantir que ninguém possa favorecer um lado. Pode sortear de novo quantas vezes quiser antes de gerar a fase de grupos.</p>' : ''}
         <button class="btn btn-ouro" id="btnSortear" ${estado.participantes.length < 2 ? 'disabled' : ''}>🎲 ${jaSorteado ? 'Sortear novamente' : 'Sortear grupos'}</button>
       </div>
       <div class="grupos-grid">
@@ -309,6 +367,21 @@ function renderParticipantes() {
     if (e.key === 'Enter') { e.target.closest('.linha-edicao').querySelector('[data-acao="salvar-edicao"]').click(); }
     if (e.key === 'Escape') cancelarEdicaoParticipante();
   });
+  app.querySelectorAll('[data-acao="toggle-nota"]').forEach((b) =>
+    b.addEventListener('click', () => alternarNota(b.dataset.chave))
+  );
+  document.getElementById('btnAddPatrocinador')?.addEventListener('click', () => {
+    const input = document.getElementById('inNomePatrocinador');
+    adicionarPatrocinador(input.value);
+    input.value = '';
+    input.focus();
+  });
+  document.getElementById('inNomePatrocinador')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('btnAddPatrocinador').click();
+  });
+  app.querySelectorAll('[data-acao="remover-patrocinador"]').forEach((b) =>
+    b.addEventListener('click', () => removerPatrocinador(b.dataset.id))
+  );
 }
 
 function tabelaClassificacaoHtml(grupo) {
@@ -481,7 +554,6 @@ function renderMataMata() {
       return;
     }
     app.innerHTML = `
-      <div class="aviso">Chaveamento provisório — os nomes reais entram automaticamente conforme cada grupo for concluído. Os placares ficam liberados quando a fase de grupos terminar.</div>
       <div class="card" style="overflow:visible;">
         <h2>Fase Eliminatória (prévia)</h2>
         <div class="bracket">
@@ -539,10 +611,17 @@ function renderMataMata() {
   });
 }
 
+function patrocinadoresLinhaHtml() {
+  const lista = estado.patrocinadores || [];
+  if (lista.length === 0) return '';
+  return `<div class="linha-patrocinadores">Patrocinado por: ${lista.map((s) => esc(s.nome)).join(' · ')}</div>`;
+}
+
 function renderCampeao() {
   if (!estado.campeao) {
     app.innerHTML = `
       <div class="card"><div class="vazio">O campeão será revelado aqui automaticamente ao final da fase eliminatória.</div></div>
+      ${patrocinadoresLinhaHtml()}
       <div class="rodape">
         <button id="btnReiniciar" class="btn btn-perigo btn-pequeno">Reiniciar torneio</button>
       </div>
@@ -566,6 +645,7 @@ function renderCampeao() {
       <div class="nome-campeao">${esc(estado.campeao)}</div>
       <div class="subtitulo">EA Sports FC 26 — PS5</div>
     </div>
+    ${patrocinadoresLinhaHtml()}
     <div class="rodape">
       <button id="btnReiniciar" class="btn btn-perigo btn-pequeno">Reiniciar torneio</button>
     </div>

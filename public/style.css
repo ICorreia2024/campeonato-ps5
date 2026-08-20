@@ -76,8 +76,17 @@ body {
   margin-bottom: 16px;
   box-shadow: var(--sombra);
 }
-.card h2 { margin-top: 0; font-size: 1.1rem; }
+.card h2 { margin-top: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 6px; }
 .card h3 { font-size: 1rem; margin: 4px 0 12px; color: var(--verde); }
+.btn-nota {
+  border: none; background: transparent; cursor: pointer; font-size: .82rem;
+  padding: 2px 4px; border-radius: 6px; line-height: 1; opacity: .7;
+}
+.btn-nota:hover { opacity: 1; background: #eef2ef; }
+
+.linha-patrocinadores {
+  text-align: center; font-size: .8rem; color: var(--texto-suave); margin: -6px 0 14px;
+}
 
 .linha-form { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
 input[type="text"], input[type="number"], select {
