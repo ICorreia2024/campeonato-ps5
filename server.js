@@ -91,11 +91,28 @@ function participantesPorGrupo() {
 }
 
 function gerarPartidasGrupo(times) {
+  // Método do polígono (circle method): cada time joga no máximo 1 vez por rodada,
+  // evitando que alguém apareça em partidas consecutivas na lista.
+  let atual = [...times];
+  const temFolga = atual.length % 2 !== 0;
+  if (temFolga) atual.push(null);
+  const n = atual.length;
+  const numRodadas = n - 1;
+  const metade = n / 2;
   const partidas = [];
-  for (let i = 0; i < times.length; i++) {
-    for (let j = i + 1; j < times.length; j++) {
-      partidas.push({ id: uid(), casa: times[i], fora: times[j], golsCasa: null, golsFora: null, data: null });
+
+  for (let rodada = 1; rodada <= numRodadas; rodada++) {
+    for (let i = 0; i < metade; i++) {
+      const casa = atual[i];
+      const fora = atual[n - 1 - i];
+      if (casa != null && fora != null) {
+        partidas.push({ id: uid(), casa, fora, golsCasa: null, golsFora: null, data: null, rodada });
+      }
     }
+    const fixo = atual[0];
+    const resto = atual.slice(1);
+    resto.unshift(resto.pop());
+    atual = [fixo, ...resto];
   }
   return partidas;
 }
@@ -146,6 +163,35 @@ function gerarMataMata() {
   estado.mataMata = { rounds: [rodada0] };
 }
 
+function montarPreviaChaveamento() {
+  if (!estado.faseGruposGerada || estado.mataMata || estado.grupos.length < 2) return null;
+
+  const rotuloClassificado = (grupoIdx, posicao) => {
+    const g = estado.grupos[grupoIdx];
+    if (grupoCompleto(g)) {
+      return { nome: calcularClassificacao(g)[posicao].time, definido: true };
+    }
+    return { nome: `${posicao === 0 ? '1º' : '2º'} ${g.nome}`, definido: false };
+  };
+
+  const rodada1 = [];
+  for (let i = 0; i < estado.grupos.length; i += 2) {
+    rodada1.push({ casa: rotuloClassificado(i, 0), fora: rotuloClassificado(i + 1, 1) });
+    rodada1.push({ casa: rotuloClassificado(i + 1, 0), fora: rotuloClassificado(i, 1) });
+  }
+
+  const rounds = [rodada1];
+  let tamanho = rodada1.length;
+  while (tamanho > 1) {
+    tamanho = tamanho / 2;
+    rounds.push(Array.from({ length: tamanho }, () => ({
+      casa: { nome: null, definido: false },
+      fora: { nome: null, definido: false }
+    })));
+  }
+  return rounds;
+}
+
 /* ============================ VIEW MODEL (o que a API expõe) ============================ */
 
 function montarEstadoPublico() {
@@ -175,7 +221,8 @@ function montarEstadoPublico() {
       completo: grupoCompleto(g),
       classificacao: calcularClassificacao(g)
     })),
-    mataMata: estado.mataMata
+    mataMata: estado.mataMata,
+    previaChaveamento: montarPreviaChaveamento()
   };
 }
 

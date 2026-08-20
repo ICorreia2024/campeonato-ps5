@@ -164,6 +164,12 @@ table.classificacao tr.classifica td:first-child { border-left: 3px solid var(--
 .partida .data-partida { flex-basis: 100%; order: -1; font-size: .8rem; color: var(--texto-suave); display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
 .partida .data-partida input[type="datetime-local"] { font-size: .8rem; padding: 5px 8px; }
 
+.titulo-rodada {
+  font-size: .74rem; font-weight: 800; color: var(--verde); text-transform: uppercase;
+  letter-spacing: .05em; margin: 16px 0 4px; padding-top: 10px; border-top: 1px dashed var(--borda);
+}
+.titulo-rodada:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+
 .pill-pen {
   display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; width: 100%;
 }
@@ -191,6 +197,8 @@ table.classificacao tr.classifica td:first-child { border-left: 3px solid var(--
 .confronto input[type="number"] { width: 42px; }
 .confronto .pen-tag { font-size: .68rem; color: var(--texto-suave); }
 .confronto .aguardando { color: var(--texto-suave); font-style: italic; font-size: .82rem; }
+.confronto-previa { opacity: .8; }
+.confronto .time-linha.provisorio { color: var(--texto-suave); font-style: italic; font-weight: 400; }
 .confronto .data-partida { font-size: .76rem; color: var(--texto-suave); display: flex; align-items: center; gap: 5px; margin-bottom: 8px; }
 .confronto .data-partida input[type="datetime-local"] { font-size: .76rem; padding: 4px 6px; width: 100%; }
 

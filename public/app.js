@@ -332,6 +332,22 @@ function partidaGrupoHtml(grupoIdx, partida) {
   `;
 }
 
+function corpoPartidasGrupo(grupo, gi) {
+  const temRodadas = grupo.partidas.some((p) => p.rodada != null);
+  if (!temRodadas) {
+    return grupo.partidas.map((p) => partidaGrupoHtml(gi, p)).join('');
+  }
+  const porRodada = {};
+  grupo.partidas.forEach((p) => {
+    const r = p.rodada ?? 0;
+    (porRodada[r] = porRodada[r] || []).push(p);
+  });
+  return Object.keys(porRodada).map(Number).sort((a, b) => a - b).map((r) => `
+    <h4 class="titulo-rodada">${r}ª RODADA</h4>
+    ${porRodada[r].map((p) => partidaGrupoHtml(gi, p)).join('')}
+  `).join('');
+}
+
 function renderGrupos() {
   if (!estado.faseGruposGerada) {
     app.innerHTML = '<div class="card"><div class="vazio">A fase de grupos ainda não foi gerada. Vá em "Participantes" para adicionar jogadores e gerar os grupos.</div></div>';
@@ -343,7 +359,7 @@ function renderGrupos() {
       <h3>${grupo.nome} ${grupo.completo ? '<span class="selo">Concluído</span>' : ''}</h3>
       ${tabelaClassificacaoHtml(grupo)}
       <div style="margin-top:14px;">
-        ${grupo.partidas.map((p) => partidaGrupoHtml(gi, p)).join('')}
+        ${corpoPartidasGrupo(grupo, gi)}
       </div>
     </div>
   `).join('') + (estado.mataMata ? '<div class="aviso">Fase de grupos concluída — confira a fase eliminatória na aba Mata-Mata.</div>' : '');
@@ -430,9 +446,37 @@ function confrontoMMHtml(rodadaIdx, partidaIdx, partida) {
   `;
 }
 
+function confrontoPreviaHtml(par) {
+  const casaTxt = par.casa.nome || 'A definir';
+  const foraTxt = par.fora.nome || 'A definir';
+  return `
+    <div class="confronto confronto-previa">
+      <div class="time-linha ${par.casa.definido ? '' : 'provisorio'}"><span class="nome">${esc(casaTxt)}</span></div>
+      <div class="time-linha ${par.fora.definido ? '' : 'provisorio'}"><span class="nome">${esc(foraTxt)}</span></div>
+    </div>
+  `;
+}
+
 function renderMataMata() {
   if (!estado.mataMata) {
-    app.innerHTML = '<div class="card"><div class="vazio">O mata-mata será gerado automaticamente assim que todos os jogos da fase de grupos forem registrados.</div></div>';
+    if (!estado.previaChaveamento) {
+      app.innerHTML = '<div class="card"><div class="vazio">O chaveamento aparece aqui assim que a fase de grupos for gerada.</div></div>';
+      return;
+    }
+    app.innerHTML = `
+      <div class="aviso">Chaveamento provisório — os nomes reais entram automaticamente conforme cada grupo for concluído. Os placares ficam liberados quando a fase de grupos terminar.</div>
+      <div class="card" style="overflow:visible;">
+        <h2>Fase Eliminatória (prévia)</h2>
+        <div class="bracket">
+          ${estado.previaChaveamento.map((rodada) => `
+            <div class="rodada-col">
+              <h4>${nomeRodada(rodada.length)}</h4>
+              ${rodada.map((p) => confrontoPreviaHtml(p)).join('')}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
     return;
   }
 
