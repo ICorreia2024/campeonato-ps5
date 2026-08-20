@@ -11,9 +11,18 @@ const PASTA_PUBLICA = path.join(__dirname, 'public');
 const ARQUIVO_ESTADO = path.join(__dirname, 'estado.json');
 const LETRAS = 'ABCDEFGH';
 
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const USAR_SUPABASE = !!(SUPABASE_URL && SUPABASE_KEY);
+const SUPABASE_TABELA = 'campeonato_ps5_estado';
+const SUPABASE_ID = 'default';
+
 const uid = () => crypto.randomBytes(5).toString('hex');
 
 /* ============================ ESTADO ============================ */
+/* Persistido no Supabase em produção (disco do Render é efêmero); cai para
+   um arquivo local quando as variáveis de ambiente não estão configuradas
+   (ex.: rodando localmente para testes). */
 
 function estadoPadrao() {
   return {
@@ -26,7 +35,21 @@ function estadoPadrao() {
   };
 }
 
-function carregarEstado() {
+async function carregarEstado() {
+  if (USAR_SUPABASE) {
+    try {
+      const r = await fetch(
+        `${SUPABASE_URL}/rest/v1/${SUPABASE_TABELA}?id=eq.${SUPABASE_ID}&select=dados`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+      );
+      if (!r.ok) throw new Error(`Supabase respondeu ${r.status}`);
+      const linhas = await r.json();
+      return linhas[0]?.dados ? { ...estadoPadrao(), ...linhas[0].dados } : estadoPadrao();
+    } catch (erro) {
+      console.error('Falha ao carregar estado do Supabase, iniciando vazio:', erro.message);
+      return estadoPadrao();
+    }
+  }
   try {
     const bruto = fs.readFileSync(ARQUIVO_ESTADO, 'utf-8');
     return { ...estadoPadrao(), ...JSON.parse(bruto) };
@@ -35,9 +58,27 @@ function carregarEstado() {
   }
 }
 
-let estado = carregarEstado();
+let estado = estadoPadrao();
 
-function salvarEstado() {
+async function salvarEstado() {
+  if (USAR_SUPABASE) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABELA}`, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates,return=minimal'
+        },
+        body: JSON.stringify({ id: SUPABASE_ID, dados: estado, atualizado_em: new Date().toISOString() })
+      });
+      if (!r.ok) console.error('Falha ao salvar estado no Supabase:', r.status, await r.text().catch(() => ''));
+    } catch (erro) {
+      console.error('Falha ao salvar estado no Supabase:', erro.message);
+    }
+    return;
+  }
   fs.writeFileSync(ARQUIVO_ESTADO, JSON.stringify(estado, null, 2), 'utf-8');
 }
 
@@ -369,14 +410,14 @@ const servidor = http.createServer(async (req, res) => {
     // POST /api/participantes
     if (req.method === 'POST' && partes[1] === 'participantes' && partes.length === 2) {
       acaoAdicionarParticipante(await lerCorpo(req));
-      salvarEstado();
+      await salvarEstado();
       return enviarJson(res, 200, montarEstadoPublico());
     }
 
     // DELETE /api/participantes/:id
     if (req.method === 'DELETE' && partes[1] === 'participantes' && partes.length === 3) {
       acaoRemoverParticipante(partes[2]);
-      salvarEstado();
+      await salvarEstado();
       return enviarJson(res, 200, montarEstadoPublico());
     }
 
@@ -384,21 +425,21 @@ const servidor = http.createServer(async (req, res) => {
     if (req.method === 'PATCH' && partes[1] === 'participantes' && partes.length === 3) {
       const corpo = await lerCorpo(req);
       acaoEditarParticipante(partes[2], corpo.nome);
-      salvarEstado();
+      await salvarEstado();
       return enviarJson(res, 200, montarEstadoPublico());
     }
 
     // POST /api/config
     if (req.method === 'POST' && partes[1] === 'config') {
       acaoDefinirConfig(await lerCorpo(req));
-      salvarEstado();
+      await salvarEstado();
       return enviarJson(res, 200, montarEstadoPublico());
     }
 
     // POST /api/iniciar-fase-grupos
     if (req.method === 'POST' && partes[1] === 'iniciar-fase-grupos') {
       acaoIniciarFaseDeGrupos();
-      salvarEstado();
+      await salvarEstado();
       return enviarJson(res, 200, montarEstadoPublico());
     }
 
@@ -406,7 +447,7 @@ const servidor = http.createServer(async (req, res) => {
     if (req.method === 'POST' && partes[1] === 'grupos' && partes[4] === 'placar') {
       const corpo = await lerCorpo(req);
       acaoSalvarPlacarGrupo(Number(partes[2]), partes[3], Number(corpo.golsCasa), Number(corpo.golsFora));
-      salvarEstado();
+      await salvarEstado();
       return enviarJson(res, 200, montarEstadoPublico());
     }
 
@@ -414,7 +455,7 @@ const servidor = http.createServer(async (req, res) => {
     if (req.method === 'POST' && partes[1] === 'grupos' && partes[4] === 'data') {
       const corpo = await lerCorpo(req);
       acaoSalvarDataGrupo(Number(partes[2]), partes[3], corpo.data);
-      salvarEstado();
+      await salvarEstado();
       return enviarJson(res, 200, montarEstadoPublico());
     }
 
@@ -422,7 +463,7 @@ const servidor = http.createServer(async (req, res) => {
     if (req.method === 'POST' && partes[1] === 'mata-mata' && partes[4] === 'data') {
       const corpo = await lerCorpo(req);
       acaoSalvarDataMataMata(Number(partes[2]), Number(partes[3]), corpo.data);
-      salvarEstado();
+      await salvarEstado();
       return enviarJson(res, 200, montarEstadoPublico());
     }
 
@@ -432,14 +473,14 @@ const servidor = http.createServer(async (req, res) => {
       const resultado = acaoSalvarPlacarMataMata(
         Number(partes[2]), Number(partes[3]), Number(corpo.golsCasa), Number(corpo.golsFora), corpo.penVencedor || null
       );
-      salvarEstado();
+      await salvarEstado();
       return enviarJson(res, 200, { ...montarEstadoPublico(), ...resultado });
     }
 
     // POST /api/reiniciar
     if (req.method === 'POST' && partes[1] === 'reiniciar') {
       acaoReiniciar();
-      salvarEstado();
+      await salvarEstado();
       return enviarJson(res, 200, montarEstadoPublico());
     }
 
@@ -451,4 +492,10 @@ const servidor = http.createServer(async (req, res) => {
   }
 });
 
-servidor.listen(PORTA, () => console.log(`Campeonato EA Sports FC 26 rodando em http://localhost:${PORTA}`));
+(async () => {
+  estado = await carregarEstado();
+  servidor.listen(PORTA, () => {
+    console.log(`Campeonato EA Sports FC 26 rodando em http://localhost:${PORTA}`);
+    console.log(`Persistência: ${USAR_SUPABASE ? 'Supabase (' + SUPABASE_URL + ')' : 'arquivo local (' + ARQUIVO_ESTADO + ')'}`);
+  });
+})();
