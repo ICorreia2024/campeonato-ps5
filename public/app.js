@@ -229,8 +229,7 @@ function secaoPatrocinadoresHtml() {
   if (!podeEditar && lista.length === 0) return '';
   return `
     <div class="card">
-      <h2>Patrocinadores ${botaoNotaHtml('patrocinadores')}</h2>
-      ${notasAbertas.has('patrocinadores') ? '<p class="texto-explicativo">Os patrocinadores são indicados na criação do torneio e não podem mais ser alterados depois que a fase de grupos for gerada.</p>' : ''}
+      <h2>Patrocinadores</h2>
       ${podeEditar ? `
         <div class="linha-form">
           <input type="text" id="inNomePatrocinador" placeholder="Nome do patrocinador" maxlength="40">
@@ -264,7 +263,7 @@ function renderParticipantes() {
   if (estado.primeiraPartidaComecou) {
     notaConfigTexto = 'O torneio já começou. Não é mais possível alterar participantes nem a configuração — reinicie o torneio para começar do zero.';
   } else if (estado.faseGruposGerada) {
-    notaConfigTexto = 'Fase de grupos já gerada — não dá mais para mudar o número de grupos, mas você ainda pode adicionar, editar ou remover participantes até a primeira partida ser jogada. Quem for adicionado entra automaticamente no grupo com menos jogadores.';
+    notaConfigTexto = 'Fase de grupos já gerada — não dá mais para mudar o número de grupos. Você ainda pode editar ou remover participantes até a primeira partida ser jogada; um novo só pode ser adicionado se algum grupo estiver com menos jogadores que os outros (vaga aberta por uma remoção).';
   }
 
   app.innerHTML = `

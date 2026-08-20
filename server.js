@@ -256,14 +256,24 @@ function acaoAdicionarParticipante({ nome }) {
   if (estado.participantes.some((p) => p.nome.toLowerCase() === limpo.toLowerCase())) {
     throw new ErroApi('Já existe um participante com esse nome.');
   }
+
+  // Fase já gerada: só permite adicionar se houver uma vaga aberta (grupo com menos
+  // times que os demais, deixada por uma remoção). Se os grupos já estiverem
+  // equilibrados, não há vaga para ocupar.
+  let grupoAlvo = null;
+  if (estado.faseGruposGerada) {
+    const tamanhos = estado.grupos.map((g) => g.times.length);
+    const minimo = Math.min(...tamanhos);
+    const maximo = Math.max(...tamanhos);
+    if (minimo === maximo) {
+      throw new ErroApi('Os grupos já estão completos e equilibrados. Remova um participante para abrir uma vaga antes de adicionar outro.');
+    }
+    grupoAlvo = estado.grupos.find((g) => g.times.length === minimo);
+  }
+
   estado.participantes.push({ id: uid(), nome: limpo });
 
-  if (estado.faseGruposGerada) {
-    // Fase já gerada: entra no grupo com menos times (ocupa a vaga de quem foi removido).
-    let grupoAlvo = estado.grupos[0];
-    for (const g of estado.grupos) {
-      if (g.times.length < grupoAlvo.times.length) grupoAlvo = g;
-    }
+  if (grupoAlvo) {
     grupoAlvo.times.push(limpo);
     grupoAlvo.partidas = gerarPartidasGrupo(grupoAlvo.times);
   }
