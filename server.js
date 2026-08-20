@@ -542,8 +542,18 @@ function calcularDestaques() {
 
   const artilheiroTop = maiorQue('gp');
   const muralhaTop = menorQue('gc');
-  const empatesTop = maiorQue('e');
   const woTop = maiorQue('wo');
+
+  // "Parceiro do Ano": pior desempenho do torneio — mesmo critério da classificação
+  // dos grupos (pontos e depois saldo de gols), só que pegando o pior em vez do melhor.
+  const piorDesempenhoTop = lista
+    .filter((x) => x.jogos > 0)
+    .map((x) => ({ ...x, pts: x.v * 2 + x.e, saldo: x.gp - x.gc }))
+    .reduce((pior, x) => {
+      if (!pior) return x;
+      if (x.pts < pior.pts || (x.pts === pior.pts && x.saldo < pior.saldo)) return x;
+      return pior;
+    }, null);
 
   let goleada = null;
   partidas.forEach((p) => {
@@ -576,7 +586,7 @@ function calcularDestaques() {
     artilheiro: artilheiroTop && artilheiroTop.gp > 0 ? { nome: artilheiroTop.nome, gols: artilheiroTop.gp } : null,
     muralha: muralhaTop ? { nome: muralhaTop.nome, sofridos: muralhaTop.gc } : null,
     invenciveis: lista.filter((x) => x.jogos > 0 && x.d === 0).map((x) => x.nome),
-    maisEmpates: empatesTop && empatesTop.e > 0 ? { nome: empatesTop.nome, empates: empatesTop.e } : null,
+    piorDesempenho: piorDesempenhoTop ? { nome: piorDesempenhoTop.nome, pontos: piorDesempenhoTop.pts, saldo: piorDesempenhoTop.saldo } : null,
     goleada,
     maisWO: woTop && woTop.wo > 0 ? { nome: woTop.nome, vezes: woTop.wo } : null
   };

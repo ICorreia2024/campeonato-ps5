@@ -999,7 +999,7 @@ function destaquesHtml() {
     { icone: '⚽', titulo: 'Artilheiro', nome: d.artilheiro?.nome, valor: d.artilheiro ? `${d.artilheiro.gols} gol${d.artilheiro.gols > 1 ? 's' : ''}` : null },
     { icone: '🧱', titulo: 'Muralha', nome: d.muralha?.nome, valor: d.muralha ? `${d.muralha.sofridos} sofrido${d.muralha.sofridos !== 1 ? 's' : ''}` : null },
     { icone: '🔥', titulo: 'Invencível', nome: d.invenciveis.length ? d.invenciveis.join(' e ') : null, valor: d.invenciveis.length ? 'nenhuma derrota' : null },
-    { icone: '🤝', titulo: 'Parceiro do Ano', nome: d.maisEmpates?.nome, valor: d.maisEmpates ? `${d.maisEmpates.empates} empate${d.maisEmpates.empates > 1 ? 's' : ''}` : null },
+    { icone: '🤝', titulo: 'Parceiro do Ano', nome: d.piorDesempenho?.nome, valor: d.piorDesempenho ? `${d.piorDesempenho.pontos} pts (saldo ${d.piorDesempenho.saldo > 0 ? '+' : ''}${d.piorDesempenho.saldo})` : null },
     { icone: '🎯', titulo: 'Goleada do Torneio', nome: d.goleada?.vencedor, valor: d.goleada ? `${d.goleada.placar} sobre ${d.goleada.perdedor}` : null },
     { icone: '🚩', titulo: 'Troféu W.O.', nome: d.maisWO?.nome, valor: d.maisWO ? `${d.maisWO.vezes}x ausente` : null }
   ];
