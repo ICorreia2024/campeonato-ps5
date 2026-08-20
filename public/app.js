@@ -350,6 +350,7 @@ function secaoSenhaHtml() {
       <input type="password" id="inNovaSenhaTorneio" placeholder="Senha do torneio (opcional)" maxlength="40" autocomplete="off">
       <button class="btn btn-secundario" id="btnDefinirSenha">Definir senha</button>
     </div>
+    <div class="aviso">⚠️ Se a senha for esquecida, não tem como recuperá-la depois — guarde em um lugar seguro assim que definir.</div>
   `;
 }
 
