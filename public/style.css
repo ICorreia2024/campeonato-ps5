@@ -258,8 +258,30 @@ table.classificacao tr.classifica td:first-child { border-left: 3px solid var(--
 .texto-explicativo { color: var(--texto-suave); font-size: .87rem; margin: 0 0 12px; line-height: 1.5; }
 .vazio { color: var(--texto-suave); font-size: .9rem; padding: 10px 0; }
 
-.bracket { display: flex; gap: 22px; overflow-x: auto; padding: 6px 0 14px; }
-.rodada-col { display: flex; flex-direction: column; justify-content: space-around; gap: 16px; min-width: 220px; }
+.bracket { display: flex; gap: 34px; overflow-x: auto; padding: 6px 10px 14px; }
+.rodada-col { display: flex; flex-direction: column; justify-content: space-around; gap: 20px; min-width: 220px; }
+.par-confrontos {
+  display: flex; flex-direction: column; justify-content: space-between; gap: 20px;
+  position: relative; margin-right: 20px;
+}
+.par-confrontos::before {
+  /* liga os dois confrontos do par por uma linha vertical, com a ponta arredondada */
+  content: '';
+  position: absolute;
+  top: 25%; bottom: 25%; right: -20px; width: 16px;
+  border: 2px solid var(--borda);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+}
+.par-confrontos::after {
+  /* leva do meio da linha vertical até o próximo confronto */
+  content: '';
+  position: absolute;
+  top: 50%; right: -36px; width: 16px; height: 2px;
+  background: var(--borda);
+}
+.rodada-col:last-child .par-confrontos::after,
+.rodada-col:last-child .par-confrontos::before { display: none; }
 .rodada-col h4 { text-align: center; color: var(--verde); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; margin: 0 0 4px; }
 .confronto {
   background: var(--card); border: 1px solid var(--borda); border-radius: 10px;

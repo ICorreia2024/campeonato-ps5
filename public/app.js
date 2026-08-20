@@ -836,12 +836,25 @@ function renderMataMata() {
       <div class="card" style="overflow:visible;">
         <h2>Fase Eliminatória (prévia)</h2>
         <div class="bracket">
-          ${estado.previaChaveamento.map((rodada) => `
-            <div class="rodada-col">
-              <h4>${nomeRodada(rodada.length)}</h4>
-              ${rodada.map((p) => confrontoPreviaHtml(p)).join('')}
-            </div>
-          `).join('')}
+          ${estado.previaChaveamento.map((rodada, ri) => {
+            const ehUltima = ri === estado.previaChaveamento.length - 1;
+            let corpo;
+            if (ehUltima) {
+              corpo = rodada.map((p) => confrontoPreviaHtml(p)).join('');
+            } else {
+              const pares = [];
+              for (let i = 0; i < rodada.length; i += 2) {
+                pares.push(`<div class="par-confrontos">${confrontoPreviaHtml(rodada[i])}${confrontoPreviaHtml(rodada[i + 1])}</div>`);
+              }
+              corpo = pares.join('');
+            }
+            return `
+              <div class="rodada-col">
+                <h4>${nomeRodada(rodada.length)}</h4>
+                ${corpo}
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>
     `;
@@ -860,12 +873,30 @@ function renderMataMata() {
     <div class="card" style="overflow:visible;">
       <h2>Fase Eliminatória</h2>
       <div class="bracket">
-        ${estado.mataMata.rounds.map((rodada, ri) => `
-          <div class="rodada-col">
-            <h4>${nomeRodada(rodada.length)}</h4>
-            ${rodada.map((p, pi) => confrontoMMHtml(ri, pi, p)).join('')}
-          </div>
-        `).join('')}
+        ${estado.mataMata.rounds.map((rodada, ri) => {
+          const ehUltima = ri === estado.mataMata.rounds.length - 1;
+          let corpo;
+          if (ehUltima) {
+            corpo = rodada.map((p, pi) => confrontoMMHtml(ri, pi, p)).join('');
+          } else {
+            const pares = [];
+            for (let i = 0; i < rodada.length; i += 2) {
+              pares.push(`
+                <div class="par-confrontos">
+                  ${confrontoMMHtml(ri, i, rodada[i])}
+                  ${confrontoMMHtml(ri, i + 1, rodada[i + 1])}
+                </div>
+              `);
+            }
+            corpo = pares.join('');
+          }
+          return `
+            <div class="rodada-col">
+              <h4>${nomeRodada(rodada.length)}</h4>
+              ${corpo}
+            </div>
+          `;
+        }).join('')}
         ${estado.mataMata.terceiroLugar ? `
           <div class="rodada-col">
             <h4>🥉 Disputa de 3º Lugar</h4>
