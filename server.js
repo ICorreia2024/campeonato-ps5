@@ -461,9 +461,46 @@ function acaoSalvarPlacarMataMata(rodadaIdx, partidaIdx, golsCasa, golsFora, pen
       }
       estado.mataMata.rounds.push(proxima);
       finalDefinida = proxima.length === 1;
+      // A rodada que acabou de virar a final tinha 2 confrontos (semifinal) — os dois
+      // perdedores dela se enfrentam pelo 3º lugar.
+      if (finalDefinida && rodada.length === 2 && !estado.mataMata.terceiroLugar) {
+        const perdedor = (m) => (m.vencedor === m.casa ? m.fora : m.casa);
+        estado.mataMata.terceiroLugar = criarPartidaMM(perdedor(rodada[0]), perdedor(rodada[1]));
+      }
     }
   }
   return { aguardandoPenalti: false, finalDefinida };
+}
+
+function acaoSalvarPlacarTerceiroLugar(golsCasa, golsFora, penVencedor, senha) {
+  const partida = estado.mataMata?.terceiroLugar;
+  if (!partida) throw new ErroApi('Disputa de 3º lugar ainda não foi gerada.', 404);
+  if (!Number.isInteger(golsCasa) || !Number.isInteger(golsFora) || golsCasa < 0 || golsFora < 0) {
+    throw new ErroApi('Placar inválido.');
+  }
+  if (partida.vencedor) verificarSenha(senha);
+
+  partida.golsCasa = golsCasa;
+  partida.golsFora = golsFora;
+
+  if (golsCasa === golsFora) {
+    if (!penVencedor || (penVencedor !== partida.casa && penVencedor !== partida.fora)) {
+      partida.vencedor = null;
+      return { aguardandoPenalti: true };
+    }
+    partida.vencedor = penVencedor;
+    partida.penaltis = true;
+  } else {
+    partida.vencedor = golsCasa > golsFora ? partida.casa : partida.fora;
+    partida.penaltis = false;
+  }
+  return { aguardandoPenalti: false };
+}
+
+function acaoSalvarDataTerceiroLugar(data) {
+  const partida = estado.mataMata?.terceiroLugar;
+  if (!partida) throw new ErroApi('Disputa de 3º lugar ainda não foi gerada.', 404);
+  partida.data = normalizarData(data);
 }
 
 function calcularFinalistas() {
@@ -476,11 +513,13 @@ function calcularFinalistas() {
 }
 
 function calcularDestaques() {
-  if (!estado.campeao || !estado.mataMata) return null;
-
+  // Fica visível e vai atualizando desde a primeira partida jogada, não só no final.
   const partidas = [];
   estado.grupos.forEach((g) => g.partidas.forEach((p) => { if (p.golsCasa != null) partidas.push(p); }));
-  estado.mataMata.rounds.forEach((r) => r.forEach((p) => { if (p.golsCasa != null) partidas.push(p); }));
+  if (estado.mataMata) {
+    estado.mataMata.rounds.forEach((r) => r.forEach((p) => { if (p.golsCasa != null) partidas.push(p); }));
+    if (estado.mataMata.terceiroLugar?.golsCasa != null) partidas.push(estado.mataMata.terceiroLugar);
+  }
   if (partidas.length === 0) return null;
 
   const stats = {};
@@ -519,17 +558,21 @@ function calcularDestaques() {
     }
   });
 
-  const ultimaRodada = estado.mataMata.rounds[estado.mataMata.rounds.length - 1];
-  const finalConfronto = ultimaRodada[0];
-  const vice = finalConfronto.vencedor === finalConfronto.casa ? finalConfronto.fora : finalConfronto.casa;
-  let terceiros = [];
-  if (estado.mataMata.rounds.length >= 2) {
-    const semi = estado.mataMata.rounds[estado.mataMata.rounds.length - 2];
-    terceiros = semi.map((p) => (p.vencedor === p.casa ? p.fora : p.casa));
+  let vice = null;
+  if (estado.mataMata && estado.campeao) {
+    const ultimaRodada = estado.mataMata.rounds[estado.mataMata.rounds.length - 1];
+    const finalConfronto = ultimaRodada[0];
+    vice = finalConfronto.vencedor === finalConfronto.casa ? finalConfronto.fora : finalConfronto.casa;
+  }
+  let terceiro = null; // null = ainda não chegou nessa fase; [nome] = decidido; [nomeA, nomeB] = em disputa
+  if (estado.mataMata?.terceiroLugar) {
+    const tl = estado.mataMata.terceiroLugar;
+    terceiro = tl.vencedor ? [tl.vencedor] : [tl.casa, tl.fora];
   }
 
   return {
-    podio: { primeiro: estado.campeao, segundo: vice, terceiros },
+    torneioFinalizado: !!estado.campeao,
+    podio: { primeiro: estado.campeao || null, segundo: vice, terceiro },
     artilheiro: artilheiroTop && artilheiroTop.gp > 0 ? { nome: artilheiroTop.nome, gols: artilheiroTop.gp } : null,
     muralha: muralhaTop ? { nome: muralhaTop.nome, sofridos: muralhaTop.gc } : null,
     invenciveis: lista.filter((x) => x.jogos > 0 && x.d === 0).map((x) => x.nome),
@@ -704,6 +747,22 @@ const servidor = http.createServer(async (req, res) => {
       acaoSalvarDataGrupo(Number(partes[2]), partes[3], corpo.data);
       await salvarEstado();
       return enviarJson(res, 200, montarEstadoPublico());
+    }
+
+    // POST /api/mata-mata/terceiro-lugar/data
+    if (req.method === 'POST' && partes[1] === 'mata-mata' && partes[2] === 'terceiro-lugar' && partes[3] === 'data') {
+      const corpo = await lerCorpo(req);
+      acaoSalvarDataTerceiroLugar(corpo.data);
+      await salvarEstado();
+      return enviarJson(res, 200, montarEstadoPublico());
+    }
+
+    // POST /api/mata-mata/terceiro-lugar/placar
+    if (req.method === 'POST' && partes[1] === 'mata-mata' && partes[2] === 'terceiro-lugar' && partes[3] === 'placar') {
+      const corpo = await lerCorpo(req);
+      const resultado = acaoSalvarPlacarTerceiroLugar(Number(corpo.golsCasa), Number(corpo.golsFora), corpo.penVencedor || null, corpo.senha);
+      await salvarEstado();
+      return enviarJson(res, 200, { ...montarEstadoPublico(), ...resultado });
     }
 
     // POST /api/mata-mata/:rodadaIdx/:partidaIdx/data

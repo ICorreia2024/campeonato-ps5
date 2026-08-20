@@ -108,8 +108,15 @@ body {
 .secao-destaques { margin: 20px 0; }
 .titulo-destaques {
   text-align: center; color: var(--verde); letter-spacing: .08em; font-size: .95rem;
-  margin-bottom: 16px; font-weight: 800;
+  margin-bottom: 16px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 8px;
 }
+.selo-ao-vivo {
+  background: var(--vermelho); color: #fff; font-size: .62rem; font-weight: 700;
+  padding: 2px 8px; border-radius: 999px; letter-spacing: .03em; text-transform: uppercase;
+  animation: pulsar-ao-vivo 1.6s ease-in-out infinite;
+}
+@keyframes pulsar-ao-vivo { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+.disputando { font-size: .65rem; color: var(--texto-suave); font-weight: 400; display: block; }
 
 .podio-destaques { display: flex; align-items: flex-end; justify-content: center; gap: 10px; margin-bottom: 20px; }
 .posicao-podio {

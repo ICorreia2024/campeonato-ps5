@@ -14,6 +14,7 @@ function paraInputData(iso) {
 let estado = null;
 let abaAtiva = 'participantes';
 let pendentePenalti = null; // { rodadaIdx, partidaIdx }
+let pendentePenaltiTerceiro = false;
 let editandoParticipanteId = null;
 let jaSorteado = false;
 let notasAbertas = new Set();
@@ -263,6 +264,25 @@ async function salvarPlacarMM(rodadaIdx, partidaIdx, golsCasa, golsFora, penVenc
   } catch (e) { toast(e.message, 'erro'); }
 }
 
+async function salvarPlacarTerceiroLugar(golsCasa, golsFora, penVencedor) {
+  const jaDecidida = !!estado.mataMata?.terceiroLugar?.vencedor;
+  const { ok, senha } = pedirSenhaSeNecessario(jaDecidida);
+  if (!ok) return;
+  try {
+    const dados = await api('/api/mata-mata/terceiro-lugar/placar', 'POST', { golsCasa, golsFora, penVencedor, senha });
+    pendentePenaltiTerceiro = !!dados.aguardandoPenalti;
+    await atualizarEstado(dados);
+  } catch (e) { toast(e.message, 'erro'); }
+}
+
+async function salvarDataTerceiroLugar(data) {
+  try {
+    const dados = await api('/api/mata-mata/terceiro-lugar/data', 'POST', { data });
+    await atualizarEstado(dados);
+    toast('Data salva.', 'ok');
+  } catch (e) { toast(e.message, 'erro'); }
+}
+
 async function salvarDataGrupo(grupoIdx, partidaId, data) {
   try {
     const dados = await api(`/api/grupos/${grupoIdx}/${partidaId}/data`, 'POST', { data });
@@ -290,6 +310,7 @@ async function reiniciarTorneio() {
   try {
     const dados = await api('/api/reiniciar', 'POST', { senha });
     pendentePenalti = null;
+    pendentePenaltiTerceiro = false;
     editandoParticipanteId = null;
     jaSorteado = false;
     mostrarFormSenha = false;
@@ -748,6 +769,52 @@ function confrontoMMHtml(rodadaIdx, partidaIdx, partida) {
   `;
 }
 
+function confrontoTerceiroLugarHtml(partida) {
+  const decidido = !!partida.vencedor;
+  const dataHtml = `
+    <div class="data-partida">
+      📅 <input type="datetime-local" class="in-data-terceiro" value="${paraInputData(partida.data)}">
+    </div>
+  `;
+
+  if (decidido) {
+    return `
+      <div class="confronto">
+        ${dataHtml}
+        <div class="time-linha ${partida.vencedor === partida.casa ? 'vencedor' : ''}">
+          <span class="nome">${esc(partida.casa)}</span><span>${partida.golsCasa}</span>
+        </div>
+        <div class="time-linha ${partida.vencedor === partida.fora ? 'vencedor' : ''}">
+          <span class="nome">${esc(partida.fora)}</span><span>${partida.golsFora}</span>
+        </div>
+        ${partida.penaltis ? `<div class="pen-tag">Decidido nos pênaltis · vencedor: ${esc(partida.vencedor)}</div>` : ''}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="confronto">
+      ${dataHtml}
+      <div class="time-linha">
+        <span class="nome">${esc(partida.casa)}</span>
+        <input type="number" min="0" class="in-terceiro-casa" value="${partida.golsCasa ?? ''}">
+      </div>
+      <div class="time-linha">
+        <span class="nome">${esc(partida.fora)}</span>
+        <input type="number" min="0" class="in-terceiro-fora" value="${partida.golsFora ?? ''}">
+      </div>
+      <button class="btn btn-pequeno btn-secundario" style="margin-top:8px;" id="btnSalvarTerceiro">Salvar</button>
+      ${pendentePenaltiTerceiro ? `
+        <div class="pill-pen">
+          <span style="font-size:.8rem;color:#7a5c00;width:100%;">Empate! Quem venceu nos pênaltis?</span>
+          <button data-acao="pen-terceiro" data-vencedor="${esc(partida.casa)}">${esc(partida.casa)}</button>
+          <button data-acao="pen-terceiro" data-vencedor="${esc(partida.fora)}">${esc(partida.fora)}</button>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
 function confrontoPreviaHtml(par) {
   const casaTxt = par.casa.nome || 'A definir';
   const foraTxt = par.fora.nome || 'A definir';
@@ -799,9 +866,33 @@ function renderMataMata() {
             ${rodada.map((p, pi) => confrontoMMHtml(ri, pi, p)).join('')}
           </div>
         `).join('')}
+        ${estado.mataMata.terceiroLugar ? `
+          <div class="rodada-col">
+            <h4>🥉 Disputa de 3º Lugar</h4>
+            ${confrontoTerceiroLugarHtml(estado.mataMata.terceiroLugar)}
+          </div>
+        ` : ''}
       </div>
     </div>
   `;
+
+  document.getElementById('btnSalvarTerceiro')?.addEventListener('click', () => {
+    const casaEl = app.querySelector('.in-terceiro-casa');
+    const foraEl = app.querySelector('.in-terceiro-fora');
+    const gc = casaEl.value === '' ? null : Math.max(0, parseInt(casaEl.value, 10));
+    const gf = foraEl.value === '' ? null : Math.max(0, parseInt(foraEl.value, 10));
+    if (gc == null || gf == null || isNaN(gc) || isNaN(gf)) { toast('Informe os dois placares.', 'erro'); return; }
+    salvarPlacarTerceiroLugar(gc, gf, null);
+  });
+  app.querySelectorAll('[data-acao="pen-terceiro"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const partida = estado.mataMata.terceiroLugar;
+      salvarPlacarTerceiroLugar(partida.golsCasa, partida.golsFora, btn.dataset.vencedor);
+    });
+  });
+  document.querySelector('.in-data-terceiro')?.addEventListener('change', (e) => {
+    salvarDataTerceiroLugar(e.target.value || null);
+  });
 
   app.querySelectorAll('[data-acao="salvar-mm"]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -851,23 +942,33 @@ function destaquesHtml() {
   if (d.goleada) trofeus.push({ icone: '🎯', titulo: 'Goleada do Torneio', nome: d.goleada.vencedor, valor: `${d.goleada.placar} sobre ${d.goleada.perdedor}` });
   if (d.maisWO) trofeus.push({ icone: '🚩', titulo: 'Troféu W.O.', nome: d.maisWO.nome, valor: `${d.maisWO.vezes}x ausente` });
 
+  const nomePosicao = (nome) => (nome ? esc(nome) : 'A definir');
+  const nomeTerceiro = !d.podio.terceiro
+    ? 'A definir'
+    : d.podio.terceiro.length === 1
+      ? esc(d.podio.terceiro[0])
+      : `${d.podio.terceiro.map(esc).join(' x ')} <span class="disputando">(disputando)</span>`;
+
   return `
     <div class="secao-destaques">
-      <h3 class="titulo-destaques">🏅 DESTAQUES DO TORNEIO</h3>
+      <h3 class="titulo-destaques">
+        ${d.torneioFinalizado ? '🏅 DESTAQUES DO TORNEIO' : '🔴 DESTAQUES AO VIVO'}
+        ${!d.torneioFinalizado ? '<span class="selo-ao-vivo">atualizando</span>' : ''}
+      </h3>
       <div class="podio-destaques">
         <div class="posicao-podio posicao-2">
           <div class="medalha">🥈</div>
-          <div class="nome-posicao">${esc(d.podio.segundo)}</div>
+          <div class="nome-posicao">${nomePosicao(d.podio.segundo)}</div>
           <div class="rotulo-posicao">2º lugar</div>
         </div>
         <div class="posicao-podio posicao-1">
           <div class="medalha">🥇</div>
-          <div class="nome-posicao">${esc(d.podio.primeiro)}</div>
+          <div class="nome-posicao">${nomePosicao(d.podio.primeiro)}</div>
           <div class="rotulo-posicao">1º lugar</div>
         </div>
         <div class="posicao-podio posicao-3">
           <div class="medalha">🥉</div>
-          <div class="nome-posicao">${d.podio.terceiros.length ? d.podio.terceiros.map(esc).join(' e ') : '—'}</div>
+          <div class="nome-posicao">${nomeTerceiro}</div>
           <div class="rotulo-posicao">3º lugar</div>
         </div>
       </div>
