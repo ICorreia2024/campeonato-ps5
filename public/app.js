@@ -793,9 +793,20 @@ app.addEventListener('change', (e) => {
   }
 });
 
+function haRascunhoNaoSalvo() {
+  // Cobre o caso em que o foco sai do campo sem o usuário ter terminado — por exemplo,
+  // enquanto o seletor de foto nativo do celular está aberto — o que faria a atualização
+  // automática apagar o que já tinha sido preenchido.
+  if (editandoParticipanteId != null) return true;
+  if (document.getElementById('inNomePatrocinador')?.value.trim()) return true;
+  if (document.getElementById('inImagemPatrocinador')?.files?.length) return true;
+  return false;
+}
+
 function usuarioDigitando() {
   const el = document.activeElement;
-  return !!el && ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName);
+  if (el && ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName)) return true;
+  return haRascunhoNaoSalvo();
 }
 
 carregarDoServidor({ inicial: true });
