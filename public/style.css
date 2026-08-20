@@ -180,6 +180,7 @@ table.classificacao tr.classifica td:first-child { border-left: 3px solid var(--
 .pill-pen button:hover { background: var(--ouro-claro); }
 
 .aviso { background: #fff6e5; border: 1px solid #f0d999; color: #7a5c00; padding: 10px 12px; border-radius: 8px; font-size: .85rem; margin-bottom: 14px; }
+.texto-explicativo { color: var(--texto-suave); font-size: .87rem; margin: 0 0 12px; line-height: 1.5; }
 .vazio { color: var(--texto-suave); font-size: .9rem; padding: 10px 0; }
 
 .bracket { display: flex; gap: 22px; overflow-x: auto; padding: 6px 0 14px; }

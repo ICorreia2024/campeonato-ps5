@@ -15,6 +15,7 @@ let estado = null;
 let abaAtiva = 'participantes';
 let pendentePenalti = null; // { rodadaIdx, partidaIdx }
 let editandoParticipanteId = null;
+let jaSorteado = false;
 let intervaloAtualizacao = null;
 
 let toastTimer;
@@ -108,6 +109,15 @@ async function definirNumGrupos(n) {
   } catch (e) { toast(e.message, 'erro'); }
 }
 
+async function sortearGrupos() {
+  try {
+    const dados = await api('/api/sortear-grupos', 'POST');
+    jaSorteado = true;
+    await atualizarEstado(dados);
+    toast('🎲 Grupos sorteados!', 'ok');
+  } catch (e) { toast(e.message, 'erro'); }
+}
+
 async function iniciarFaseDeGrupos() {
   try {
     const dados = await api('/api/iniciar-fase-grupos', 'POST');
@@ -163,6 +173,7 @@ async function reiniciarTorneio() {
     const dados = await api('/api/reiniciar', 'POST');
     pendentePenalti = null;
     editandoParticipanteId = null;
+    jaSorteado = false;
     estado = null;
     abaAtiva = 'participantes';
     document.querySelectorAll('.aba-btn').forEach((b) => b.classList.toggle('ativa', b.dataset.aba === 'participantes'));
@@ -248,6 +259,11 @@ function renderParticipantes() {
     </div>
 
     ${!estado.faseGruposGerada ? `
+      <div class="card">
+        <h2>3. Sorteio dos Grupos</h2>
+        <p class="texto-explicativo">Os grupos abaixo são montados por sorteio aleatório — sem escolha manual — pra garantir que ninguém possa favorecer um lado. Pode sortear de novo quantas vezes quiser antes de gerar a fase de grupos.</p>
+        <button class="btn btn-ouro" id="btnSortear" ${estado.participantes.length < 2 ? 'disabled' : ''}>🎲 ${jaSorteado ? 'Sortear novamente' : 'Sortear grupos'}</button>
+      </div>
       <div class="grupos-grid">
         ${grupos.map((g, i) => `
           <div class="card">
@@ -262,6 +278,7 @@ function renderParticipantes() {
     ` : ''}
   `;
 
+  document.getElementById('btnSortear')?.addEventListener('click', sortearGrupos);
   document.getElementById('selNumGrupos')?.addEventListener('change', (e) => definirNumGrupos(Number(e.target.value)));
   document.getElementById('btnAddParticipante')?.addEventListener('click', () => {
     const input = document.getElementById('inNomeParticipante');

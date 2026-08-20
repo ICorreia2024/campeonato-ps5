@@ -289,6 +289,15 @@ function acaoEditarParticipante(id, novoNome) {
   }
 }
 
+function acaoSortearGrupos() {
+  if (estado.faseGruposGerada) throw new ErroApi('A fase de grupos já foi gerada.');
+  if (estado.participantes.length < 2) throw new ErroApi('Adicione pelo menos 2 participantes antes de sortear.');
+  for (let i = estado.participantes.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [estado.participantes[i], estado.participantes[j]] = [estado.participantes[j], estado.participantes[i]];
+  }
+}
+
 function acaoDefinirConfig({ numGrupos }) {
   if (estado.faseGruposGerada) throw new ErroApi('A fase de grupos já foi gerada.');
   if (![2, 4, 8].includes(Number(numGrupos))) throw new ErroApi('Número de grupos inválido.');
@@ -472,6 +481,13 @@ const servidor = http.createServer(async (req, res) => {
     if (req.method === 'PATCH' && partes[1] === 'participantes' && partes.length === 3) {
       const corpo = await lerCorpo(req);
       acaoEditarParticipante(partes[2], corpo.nome);
+      await salvarEstado();
+      return enviarJson(res, 200, montarEstadoPublico());
+    }
+
+    // POST /api/sortear-grupos
+    if (req.method === 'POST' && partes[1] === 'sortear-grupos') {
+      acaoSortearGrupos();
       await salvarEstado();
       return enviarJson(res, 200, montarEstadoPublico());
     }
