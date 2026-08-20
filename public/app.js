@@ -541,7 +541,13 @@ function renderMataMata() {
 
 function renderCampeao() {
   if (!estado.campeao) {
-    app.innerHTML = '<div class="card"><div class="vazio">O campeão será revelado aqui automaticamente ao final da fase eliminatória.</div></div>';
+    app.innerHTML = `
+      <div class="card"><div class="vazio">O campeão será revelado aqui automaticamente ao final da fase eliminatória.</div></div>
+      <div class="rodape">
+        <button id="btnReiniciar" class="btn btn-perigo btn-pequeno">Reiniciar torneio</button>
+      </div>
+    `;
+    document.getElementById('btnReiniciar').addEventListener('click', reiniciarTorneio);
     return;
   }
   const confetesEmoji = ['🎉', '⚽', '🎊', '🏅', '✨'];
