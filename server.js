@@ -31,10 +31,15 @@ function estadoPadrao() {
     participantes: [],
     patrocinadores: [],
     carrosselIntervalo: 4,
+    senhaHash: null,
     grupos: [],
     mataMata: null,
     campeao: null
   };
+}
+
+function hashSenha(senha) {
+  return crypto.createHash('sha256').update(String(senha)).digest('hex');
 }
 
 async function carregarEstado() {
@@ -215,6 +220,7 @@ function montarEstadoPublico() {
     participantes: participantesComGrupo,
     patrocinadores: estado.patrocinadores,
     carrosselIntervalo: estado.carrosselIntervalo,
+    temSenha: !!estado.senhaHash,
     campeao: estado.campeao,
     finalistas: calcularFinalistas(),
     gruposPorTime: estado.faseGruposGerada ? null : participantesPorGrupo(),
@@ -451,8 +457,38 @@ function calcularFinalistas() {
   return { casa: confronto.casa, fora: confronto.fora };
 }
 
-function acaoReiniciar() {
+function acaoReiniciar({ senha } = {}) {
+  if (estado.senhaHash) {
+    if (!senha || hashSenha(senha) !== estado.senhaHash) {
+      throw new ErroApi('Senha incorreta.', 403);
+    }
+  }
   estado = estadoPadrao();
+}
+
+function acaoDefinirSenha({ senha, senhaAtual }) {
+  const novaSenha = String(senha ?? '').trim();
+
+  if (estado.senhaHash) {
+    // Já existe senha: só quem sabe a atual pode trocar ou remover.
+    if (!senhaAtual || hashSenha(senhaAtual) !== estado.senhaHash) {
+      throw new ErroApi('Senha atual incorreta.', 403);
+    }
+    if (!novaSenha) {
+      estado.senhaHash = null; // remove a proteção
+      return;
+    }
+    if (novaSenha.length < 4) throw new ErroApi('A nova senha deve ter pelo menos 4 caracteres.');
+    estado.senhaHash = hashSenha(novaSenha);
+    return;
+  }
+
+  // Ainda não tem senha: só pode ser definida na criação do torneio, antes dos
+  // grupos gerados — depois disso, se ninguém definiu, o torneio fica sem essa proteção.
+  if (estado.faseGruposGerada) throw new ErroApi('Só é possível definir a senha antes da fase de grupos ser gerada.');
+  if (!novaSenha) throw new ErroApi('Informe uma senha.');
+  if (novaSenha.length < 4) throw new ErroApi('A senha deve ter pelo menos 4 caracteres.');
+  estado.senhaHash = hashSenha(novaSenha);
 }
 
 /* ============================ SERVIDOR HTTP ============================ */
@@ -607,7 +643,14 @@ const servidor = http.createServer(async (req, res) => {
 
     // POST /api/reiniciar
     if (req.method === 'POST' && partes[1] === 'reiniciar') {
-      acaoReiniciar();
+      acaoReiniciar(await lerCorpo(req));
+      await salvarEstado();
+      return enviarJson(res, 200, montarEstadoPublico());
+    }
+
+    // POST /api/senha
+    if (req.method === 'POST' && partes[1] === 'senha') {
+      acaoDefinirSenha(await lerCorpo(req));
       await salvarEstado();
       return enviarJson(res, 200, montarEstadoPublico());
     }

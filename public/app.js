@@ -17,6 +17,7 @@ let pendentePenalti = null; // { rodadaIdx, partidaIdx }
 let editandoParticipanteId = null;
 let jaSorteado = false;
 let notasAbertas = new Set();
+let mostrarFormSenha = false;
 let carrosselIndice = 0;
 let carrosselTickAcumulado = 0;
 let intervaloAtualizacao = null;
@@ -262,16 +263,43 @@ async function salvarDataMM(rodadaIdx, partidaIdx, data) {
 }
 
 async function reiniciarTorneio() {
-  if (!confirm('Isso vai apagar participantes, grupos, placares e o campeão para todo mundo. Deseja mesmo reiniciar?')) return;
+  let senha = null;
+  if (estado.temSenha) {
+    senha = prompt('Este torneio é protegido. Digite a senha para reiniciar:');
+    if (senha === null) return; // cancelou
+  } else if (!confirm('Isso vai apagar participantes, grupos, placares e o campeão para todo mundo. Deseja mesmo reiniciar?')) {
+    return;
+  }
   try {
-    const dados = await api('/api/reiniciar', 'POST');
+    const dados = await api('/api/reiniciar', 'POST', { senha });
     pendentePenalti = null;
     editandoParticipanteId = null;
     jaSorteado = false;
+    mostrarFormSenha = false;
     estado = null;
     abaAtiva = 'participantes';
     document.querySelectorAll('.aba-btn').forEach((b) => b.classList.toggle('ativa', b.dataset.aba === 'participantes'));
     await atualizarEstado(dados);
+  } catch (e) { toast(e.message, 'erro'); }
+}
+
+async function definirSenhaTorneio(senha) {
+  const limpa = senha.trim();
+  if (!limpa) { toast('Informe uma senha.', 'erro'); return; }
+  try {
+    const dados = await api('/api/senha', 'POST', { senha: limpa });
+    await atualizarEstado(dados);
+    toast('🔒 Senha definida! Guarde bem — só quem souber consegue reiniciar o torneio.', 'ok');
+  } catch (e) { toast(e.message, 'erro'); }
+}
+
+async function alterarOuRemoverSenha(senhaAtual, novaSenha) {
+  if (!senhaAtual.trim()) { toast('Informe a senha atual.', 'erro'); return; }
+  try {
+    const dados = await api('/api/senha', 'POST', { senha: novaSenha.trim(), senhaAtual: senhaAtual.trim() });
+    mostrarFormSenha = false;
+    await atualizarEstado(dados);
+    toast(novaSenha.trim() ? 'Senha alterada!' : 'Senha removida — o torneio ficou sem proteção.', 'ok');
   } catch (e) { toast(e.message, 'erro'); }
 }
 
@@ -298,6 +326,31 @@ function alternarNota(chave) {
 
 function botaoNotaHtml(chave) {
   return `<button type="button" class="btn-nota" data-acao="toggle-nota" data-chave="${chave}" title="Mostrar/ocultar explicação">ℹ️</button>`;
+}
+
+function secaoSenhaHtml() {
+  if (estado.temSenha) {
+    return `
+      <div class="linha-form">
+        <span class="selo">🔒 Torneio protegido por senha</span>
+        <button class="btn btn-secundario btn-pequeno" id="btnToggleSenha">${mostrarFormSenha ? 'Cancelar' : 'Alterar/remover senha'}</button>
+      </div>
+      ${mostrarFormSenha ? `
+        <div class="linha-form">
+          <input type="password" id="inSenhaAtual" placeholder="Senha atual" autocomplete="off">
+          <input type="password" id="inSenhaNova" placeholder="Nova senha (em branco remove)" autocomplete="off">
+          <button class="btn btn-pequeno" id="btnSalvarSenha">Salvar</button>
+        </div>
+      ` : ''}
+    `;
+  }
+  if (estado.faseGruposGerada) return '';
+  return `
+    <div class="linha-form">
+      <input type="password" id="inNovaSenhaTorneio" placeholder="Senha do torneio (opcional)" maxlength="40" autocomplete="off">
+      <button class="btn btn-secundario" id="btnDefinirSenha">Definir senha</button>
+    </div>
+  `;
 }
 
 function carrosselHtml(lista) {
@@ -375,6 +428,7 @@ function renderParticipantes() {
       <div class="linha-form">
         <select id="selNumGrupos" ${estado.faseGruposGerada ? 'disabled' : ''}>${opcoesGrupo}</select>
       </div>
+      ${secaoSenhaHtml()}
     </div>
 
     ${secaoPatrocinadoresHtml()}
@@ -439,6 +493,19 @@ function renderParticipantes() {
 
   document.getElementById('btnSortear')?.addEventListener('click', sortearGrupos);
   document.getElementById('selNumGrupos')?.addEventListener('change', (e) => definirNumGrupos(Number(e.target.value)));
+  document.getElementById('btnDefinirSenha')?.addEventListener('click', () => {
+    const input = document.getElementById('inNovaSenhaTorneio');
+    definirSenhaTorneio(input.value);
+  });
+  document.getElementById('btnToggleSenha')?.addEventListener('click', () => {
+    mostrarFormSenha = !mostrarFormSenha;
+    render();
+  });
+  document.getElementById('btnSalvarSenha')?.addEventListener('click', () => {
+    const senhaAtual = document.getElementById('inSenhaAtual').value;
+    const senhaNova = document.getElementById('inSenhaNova').value;
+    alterarOuRemoverSenha(senhaAtual, senhaNova);
+  });
   document.getElementById('btnAddParticipante')?.addEventListener('click', () => {
     const input = document.getElementById('inNomeParticipante');
     adicionarParticipante(input.value);
@@ -800,6 +867,8 @@ function haRascunhoNaoSalvo() {
   if (editandoParticipanteId != null) return true;
   if (document.getElementById('inNomePatrocinador')?.value.trim()) return true;
   if (document.getElementById('inImagemPatrocinador')?.files?.length) return true;
+  if (document.getElementById('inNovaSenhaTorneio')?.value) return true;
+  if (document.getElementById('inSenhaAtual')?.value || document.getElementById('inSenhaNova')?.value) return true;
   return false;
 }
 
