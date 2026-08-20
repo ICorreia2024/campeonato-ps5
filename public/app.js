@@ -83,15 +83,42 @@ function lerArquivoComoDataUrl(arquivo) {
   });
 }
 
-const TAMANHO_MAX_ARQUIVO_IMAGEM = 1_000_000; // ~1MB
+// Redimensiona e comprime a imagem no navegador antes de enviar — fotos tiradas
+// direto do celular costumam vir com vários MB, e isso garante um arquivo pequeno
+// sem depender do tamanho original. O fundo branco também combina com a moldura
+// do carrossel/lista de patrocinadores.
+function comprimirImagem(arquivo, larguraMax = 640, alturaMax = 320, qualidade = 0.85) {
+  return new Promise((resolve, reject) => {
+    lerArquivoComoDataUrl(arquivo).then((dataUrl) => {
+      const img = new Image();
+      img.onload = () => {
+        const escala = Math.min(1, larguraMax / img.width, alturaMax / img.height);
+        const largura = Math.max(1, Math.round(img.width * escala));
+        const altura = Math.max(1, Math.round(img.height * escala));
+        const canvas = document.createElement('canvas');
+        canvas.width = largura;
+        canvas.height = altura;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, largura, altura);
+        ctx.drawImage(img, 0, 0, largura, altura);
+        resolve(canvas.toDataURL('image/jpeg', qualidade));
+      };
+      img.onerror = () => reject(new Error('Não foi possível processar a imagem. Tente outro arquivo.'));
+      img.src = dataUrl;
+    }).catch(reject);
+  });
+}
+
+const TAMANHO_MAX_ARQUIVO_ORIGINAL = 15_000_000; // ~15MB antes de comprimir
 
 async function adicionarPatrocinador(nome, arquivo) {
   const limpo = nome.trim();
   if (!limpo) { toast('Informe o nome do patrocinador.', 'erro'); return; }
   if (!arquivo) { toast('Selecione uma imagem para o patrocinador.', 'erro'); return; }
-  if (arquivo.size > TAMANHO_MAX_ARQUIVO_IMAGEM) { toast('Imagem muito grande. Envie um arquivo de até 1MB.', 'erro'); return; }
+  if (arquivo.size > TAMANHO_MAX_ARQUIVO_ORIGINAL) { toast('Imagem muito grande — escolha um arquivo menor.', 'erro'); return; }
   try {
-    const imagem = await lerArquivoComoDataUrl(arquivo);
+    const imagem = await comprimirImagem(arquivo);
     const dados = await api('/api/patrocinadores', 'POST', { nome: limpo, imagem });
     await atualizarEstado(dados);
     toast('Patrocinador adicionado!', 'ok');
@@ -274,7 +301,7 @@ function secaoPatrocinadoresHtml() {
     <div class="card">
       <h2>Patrocinadores</h2>
       ${podeEditar ? `
-        <p class="texto-explicativo">Tamanho recomendado da imagem: <strong>320×160px</strong> (proporção 2:1). Qualquer tamanho é aceito e ajustado automaticamente, até 1MB por arquivo.</p>
+        <p class="texto-explicativo">Moldura de exibição: <strong>320×160px</strong> (proporção 2:1). Pode enviar qualquer foto ou logo — o tamanho é ajustado e comprimido automaticamente.</p>
         <div class="linha-form linha-form-patrocinador">
           <input type="text" id="inNomePatrocinador" placeholder="Nome do patrocinador" maxlength="40">
           <input type="file" id="inImagemPatrocinador" accept="image/*">
