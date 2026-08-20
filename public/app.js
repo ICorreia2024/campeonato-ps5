@@ -1061,7 +1061,6 @@ function confetesHtml(qtd) {
 function renderCampeao() {
   if (!estado.campeao) {
     app.innerHTML = `
-      <div class="card"><div class="vazio">O campeão será revelado aqui automaticamente ao final da fase eliminatória.</div></div>
       ${destaquesHtml()}
       ${patrocinadoresListaHtml()}
       <div class="rodape">
