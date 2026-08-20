@@ -50,23 +50,30 @@ function pedirSenhaSeNecessario(precisa) {
   return { ok: true, senha };
 }
 
-async function atualizarEstado(novoEstado, { silencioso } = {}) {
+async function atualizarEstado(novoEstado, { semRenderizar } = {}) {
   const eraCampeao = estado?.campeao;
   estado = novoEstado;
-  if (!eraCampeao && estado.campeao) {
+  const virouCampeaoAgora = !eraCampeao && estado.campeao;
+  if (virouCampeaoAgora) {
     abaAtiva = 'campeao';
     mostrarBannerParabens = true;
     toast(`🏆 ${estado.campeao} é o campeão!`, 'ok');
   }
   document.querySelectorAll('.aba-btn').forEach((b) => b.classList.toggle('ativa', b.dataset.aba === abaAtiva));
+  // Um momento tão importante quanto o campeão sendo decidido merece aparecer na hora,
+  // mesmo que a pessoa esteja com o chaveamento rolado ou digitando algo em outro campo.
+  if (semRenderizar && !virouCampeaoAgora) return;
   render();
-  if (!silencioso) {} // reservado
 }
 
 async function carregarDoServidor({ inicial } = {}) {
   try {
     const dados = await api('/api/estado');
-    await atualizarEstado(dados);
+    // Os dados são sempre buscados e mantidos atualizados; só a tela não é redesenhada
+    // enquanto a pessoa estiver digitando ou com o chaveamento rolado, pra não atrapalhar.
+    // Assim que ela terminar, a próxima sincronização (ou o retorno do scroll) já mostra
+    // a versão mais recente, sem esperar.
+    await atualizarEstado(dados, { semRenderizar: !inicial && usuarioDigitando() });
     if (inicial) carregando.style.display = 'none';
   } catch (e) {
     if (inicial) { carregando.textContent = 'Não foi possível conectar ao servidor.'; }
@@ -1153,11 +1160,18 @@ function usuarioDigitando() {
 carregarDoServidor({ inicial: true });
 
 // Mantém a página sincronizada entre todos os participantes que a acessam ao mesmo tempo.
-// Pula a atualização enquanto alguém estiver digitando, para não perder o foco do campo (e o teclado, no celular).
+// Os dados são sempre buscados; carregarDoServidor decide se redesenha a tela na hora ou não.
 intervaloAtualizacao = setInterval(() => {
-  if (usuarioDigitando()) return;
   carregarDoServidor();
 }, 5000);
+
+// Assim que a pessoa voltar a rolagem do chaveamento pro início, mostra a versão mais
+// recente na hora — sem precisar esperar a próxima sincronização automática.
+app.addEventListener('scroll', (e) => {
+  if (e.target.classList?.contains('bracket') && e.target.scrollLeft === 0) {
+    render();
+  }
+}, true);
 
 // Avança o carrossel de patrocinadores sozinho, mexendo só na imagem (sem re-renderizar
 // a página inteira, pra não interromper quem estiver digitando em outro campo).
