@@ -239,7 +239,8 @@ function montarEstadoPublico() {
       classificacao: calcularClassificacao(g)
     })),
     mataMata: estado.mataMata,
-    previaChaveamento: montarPreviaChaveamento()
+    previaChaveamento: montarPreviaChaveamento(),
+    destaques: calcularDestaques()
   };
 }
 
@@ -375,7 +376,7 @@ function acaoIniciarFaseDeGrupos() {
   estado.faseGruposGerada = true;
 }
 
-function acaoSalvarPlacarGrupo(grupoIdx, partidaId, golsCasa, golsFora, senha) {
+function acaoSalvarPlacarGrupo(grupoIdx, partidaId, golsCasa, golsFora, senha, wo, woAusente) {
   const grupo = estado.grupos[grupoIdx];
   if (!grupo) throw new ErroApi('Grupo não encontrado.', 404);
   const partida = grupo.partidas.find((p) => p.id === partidaId);
@@ -389,6 +390,8 @@ function acaoSalvarPlacarGrupo(grupoIdx, partidaId, golsCasa, golsFora, senha) {
 
   partida.golsCasa = golsCasa;
   partida.golsFora = golsFora;
+  partida.wo = !!wo;
+  partida.woAusente = wo && (woAusente === partida.casa || woAusente === partida.fora) ? woAusente : null;
 
   if (faseGruposCompleta() && !estado.mataMata) {
     gerarMataMata();
@@ -470,6 +473,70 @@ function calcularFinalistas() {
   const [confronto] = ultimaRodada;
   if (!confronto.casa || !confronto.fora) return null;
   return { casa: confronto.casa, fora: confronto.fora };
+}
+
+function calcularDestaques() {
+  if (!estado.campeao || !estado.mataMata) return null;
+
+  const partidas = [];
+  estado.grupos.forEach((g) => g.partidas.forEach((p) => { if (p.golsCasa != null) partidas.push(p); }));
+  estado.mataMata.rounds.forEach((r) => r.forEach((p) => { if (p.golsCasa != null) partidas.push(p); }));
+  if (partidas.length === 0) return null;
+
+  const stats = {};
+  const pega = (nome) => (stats[nome] ??= { nome, gp: 0, gc: 0, v: 0, d: 0, e: 0, jogos: 0, wo: 0 });
+
+  partidas.forEach((p) => {
+    const casa = pega(p.casa), fora = pega(p.fora);
+    casa.jogos++; fora.jogos++;
+    casa.gp += p.golsCasa; casa.gc += p.golsFora;
+    fora.gp += p.golsFora; fora.gc += p.golsCasa;
+    if (p.golsCasa > p.golsFora) { casa.v++; fora.d++; }
+    else if (p.golsCasa < p.golsFora) { fora.v++; casa.d++; }
+    else { casa.e++; fora.e++; }
+    if (p.wo && p.woAusente) pega(p.woAusente).wo++;
+  });
+
+  const lista = Object.values(stats);
+  const maiorQue = (campo) => lista.reduce((m, x) => (x[campo] > (m?.[campo] ?? -Infinity) ? x : m), null);
+  const menorQue = (campo) => lista.filter((x) => x.jogos > 0).reduce((m, x) => (x[campo] < (m?.[campo] ?? Infinity) ? x : m), null);
+
+  const artilheiroTop = maiorQue('gp');
+  const muralhaTop = menorQue('gc');
+  const empatesTop = maiorQue('e');
+  const woTop = maiorQue('wo');
+
+  let goleada = null;
+  partidas.forEach((p) => {
+    const dif = Math.abs(p.golsCasa - p.golsFora);
+    if (dif > 0 && (!goleada || dif > goleada.diferenca)) {
+      goleada = {
+        vencedor: p.golsCasa > p.golsFora ? p.casa : p.fora,
+        perdedor: p.golsCasa > p.golsFora ? p.fora : p.casa,
+        diferenca: dif,
+        placar: `${p.golsCasa}-${p.golsFora}`
+      };
+    }
+  });
+
+  const ultimaRodada = estado.mataMata.rounds[estado.mataMata.rounds.length - 1];
+  const finalConfronto = ultimaRodada[0];
+  const vice = finalConfronto.vencedor === finalConfronto.casa ? finalConfronto.fora : finalConfronto.casa;
+  let terceiros = [];
+  if (estado.mataMata.rounds.length >= 2) {
+    const semi = estado.mataMata.rounds[estado.mataMata.rounds.length - 2];
+    terceiros = semi.map((p) => (p.vencedor === p.casa ? p.fora : p.casa));
+  }
+
+  return {
+    podio: { primeiro: estado.campeao, segundo: vice, terceiros },
+    artilheiro: artilheiroTop && artilheiroTop.gp > 0 ? { nome: artilheiroTop.nome, gols: artilheiroTop.gp } : null,
+    muralha: muralhaTop ? { nome: muralhaTop.nome, sofridos: muralhaTop.gc } : null,
+    invenciveis: lista.filter((x) => x.jogos > 0 && x.d === 0).map((x) => x.nome),
+    maisEmpates: empatesTop && empatesTop.e > 0 ? { nome: empatesTop.nome, empates: empatesTop.e } : null,
+    goleada,
+    maisWO: woTop && woTop.wo > 0 ? { nome: woTop.nome, vezes: woTop.wo } : null
+  };
 }
 
 function acaoReiniciar({ senha } = {}) {
@@ -626,7 +693,7 @@ const servidor = http.createServer(async (req, res) => {
     // POST /api/grupos/:grupoIdx/:partidaId/placar
     if (req.method === 'POST' && partes[1] === 'grupos' && partes[4] === 'placar') {
       const corpo = await lerCorpo(req);
-      acaoSalvarPlacarGrupo(Number(partes[2]), partes[3], Number(corpo.golsCasa), Number(corpo.golsFora), corpo.senha);
+      acaoSalvarPlacarGrupo(Number(partes[2]), partes[3], Number(corpo.golsCasa), Number(corpo.golsFora), corpo.senha, corpo.wo, corpo.woAusente);
       await salvarEstado();
       return enviarJson(res, 200, montarEstadoPublico());
     }

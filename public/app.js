@@ -231,13 +231,13 @@ async function iniciarFaseDeGrupos() {
   } catch (e) { toast(e.message, 'erro'); }
 }
 
-async function salvarPlacarGrupo(grupoIdx, partidaId, golsCasa, golsFora) {
+async function salvarPlacarGrupo(grupoIdx, partidaId, golsCasa, golsFora, wo, woAusente) {
   const partidaAtual = estado.grupos[grupoIdx]?.partidas.find((p) => p.id === partidaId);
   const jaTinhaPlacar = !!partidaAtual && (partidaAtual.golsCasa != null || partidaAtual.golsFora != null);
   const { ok, senha } = pedirSenhaSeNecessario(jaTinhaPlacar);
   if (!ok) return;
   try {
-    const dados = await api(`/api/grupos/${grupoIdx}/${partidaId}/placar`, 'POST', { golsCasa, golsFora, senha });
+    const dados = await api(`/api/grupos/${grupoIdx}/${partidaId}/placar`, 'POST', { golsCasa, golsFora, senha, wo, woAusente });
     const gerouMataMata = !estado.mataMata && dados.mataMata;
     await atualizarEstado(dados);
     if (gerouMataMata) toast('Fase de grupos concluída! Mata-mata gerado.', 'ok');
@@ -618,6 +618,14 @@ function partidaGrupoHtml(grupoIdx, partida) {
       <span class="time direita">${esc(partida.fora)}</span>
       <button class="btn btn-pequeno btn-secundario" data-acao="salvar-grupo" data-grupo="${grupoIdx}" data-partida="${partida.id}">Salvar</button>
       ${jogada ? '<span class="status-ok">✓ Registrado</span>' : ''}
+      <span class="linha-wo">
+        <label class="rotulo-wo"><input type="checkbox" class="in-wo-grupo" data-partida="${partida.id}" ${partida.wo ? 'checked' : ''}> Vencido por W.O.</label>
+        <select class="in-wo-ausente" data-partida="${partida.id}" style="${partida.wo ? '' : 'display:none;'}">
+          <option value="">Quem não compareceu?</option>
+          <option value="${esc(partida.casa)}" ${partida.woAusente === partida.casa ? 'selected' : ''}>${esc(partida.casa)}</option>
+          <option value="${esc(partida.fora)}" ${partida.woAusente === partida.fora ? 'selected' : ''}>${esc(partida.fora)}</option>
+        </select>
+      </span>
     </div>
   `;
 }
@@ -663,7 +671,11 @@ function renderGrupos() {
       const gc = casaEl.value === '' ? null : Math.max(0, parseInt(casaEl.value, 10));
       const gf = foraEl.value === '' ? null : Math.max(0, parseInt(foraEl.value, 10));
       if (gc == null || gf == null || isNaN(gc) || isNaN(gf)) { toast('Informe os dois placares.', 'erro'); return; }
-      salvarPlacarGrupo(gi, pid, gc, gf);
+      const woEl = app.querySelector(`.in-wo-grupo[data-partida="${pid}"]`);
+      const woAusenteEl = app.querySelector(`.in-wo-ausente[data-partida="${pid}"]`);
+      const wo = !!woEl?.checked;
+      if (wo && !woAusenteEl.value) { toast('Selecione quem não compareceu.', 'erro'); return; }
+      salvarPlacarGrupo(gi, pid, gc, gf, wo, woAusenteEl.value || null);
     });
   });
 }
@@ -828,6 +840,53 @@ function patrocinadoresListaHtml() {
   `;
 }
 
+function destaquesHtml() {
+  const d = estado.destaques;
+  if (!d) return '';
+  const trofeus = [];
+  if (d.artilheiro) trofeus.push({ icone: '⚽', titulo: 'Artilheiro', nome: d.artilheiro.nome, valor: `${d.artilheiro.gols} gol${d.artilheiro.gols > 1 ? 's' : ''}` });
+  if (d.muralha) trofeus.push({ icone: '🧱', titulo: 'Muralha', nome: d.muralha.nome, valor: `${d.muralha.sofridos} sofrido${d.muralha.sofridos !== 1 ? 's' : ''}` });
+  if (d.invenciveis.length) trofeus.push({ icone: '🔥', titulo: 'Invencível', nome: d.invenciveis.join(' e '), valor: 'nenhuma derrota' });
+  if (d.maisEmpates) trofeus.push({ icone: '🤝', titulo: 'Parceiro do Ano', nome: d.maisEmpates.nome, valor: `${d.maisEmpates.empates} empate${d.maisEmpates.empates > 1 ? 's' : ''}` });
+  if (d.goleada) trofeus.push({ icone: '🎯', titulo: 'Goleada do Torneio', nome: d.goleada.vencedor, valor: `${d.goleada.placar} sobre ${d.goleada.perdedor}` });
+  if (d.maisWO) trofeus.push({ icone: '🚩', titulo: 'Troféu W.O.', nome: d.maisWO.nome, valor: `${d.maisWO.vezes}x ausente` });
+
+  return `
+    <div class="secao-destaques">
+      <h3 class="titulo-destaques">🏅 DESTAQUES DO TORNEIO</h3>
+      <div class="podio-destaques">
+        <div class="posicao-podio posicao-2">
+          <div class="medalha">🥈</div>
+          <div class="nome-posicao">${esc(d.podio.segundo)}</div>
+          <div class="rotulo-posicao">2º lugar</div>
+        </div>
+        <div class="posicao-podio posicao-1">
+          <div class="medalha">🥇</div>
+          <div class="nome-posicao">${esc(d.podio.primeiro)}</div>
+          <div class="rotulo-posicao">1º lugar</div>
+        </div>
+        <div class="posicao-podio posicao-3">
+          <div class="medalha">🥉</div>
+          <div class="nome-posicao">${d.podio.terceiros.length ? d.podio.terceiros.map(esc).join(' e ') : '—'}</div>
+          <div class="rotulo-posicao">3º lugar</div>
+        </div>
+      </div>
+      ${trofeus.length ? `
+        <div class="grade-trofeus">
+          ${trofeus.map((t) => `
+            <div class="cartao-trofeu">
+              <div class="icone-trofeu">${t.icone}</div>
+              <div class="titulo-trofeu">${t.titulo}</div>
+              <div class="nome-trofeu">${esc(t.nome)}</div>
+              <div class="valor-trofeu">${esc(t.valor)}</div>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
 function renderCampeao() {
   if (!estado.campeao) {
     app.innerHTML = `
@@ -856,6 +915,7 @@ function renderCampeao() {
       <div class="nome-campeao">${esc(estado.campeao)}</div>
       <div class="subtitulo">EA Sports FC 26 — PS5</div>
     </div>
+    ${destaquesHtml()}
     ${patrocinadoresListaHtml()}
     <div class="rodape">
       <button id="btnReiniciar" class="btn btn-perigo btn-pequeno">Reiniciar torneio</button>
@@ -875,6 +935,9 @@ app.addEventListener('change', (e) => {
     salvarDataGrupo(Number(e.target.dataset.grupo), e.target.dataset.partida, e.target.value || null);
   } else if (e.target.matches('.in-data-mm')) {
     salvarDataMM(Number(e.target.dataset.rodada), Number(e.target.dataset.idx), e.target.value || null);
+  } else if (e.target.matches('.in-wo-grupo')) {
+    const select = app.querySelector(`.in-wo-ausente[data-partida="${e.target.dataset.partida}"]`);
+    if (select) select.style.display = e.target.checked ? '' : 'none';
   }
 });
 

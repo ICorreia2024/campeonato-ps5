@@ -105,6 +105,35 @@ body {
 .carrossel-dots .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--borda); transition: background .2s; }
 .carrossel-dots .dot.ativo { background: var(--gramado); }
 
+.secao-destaques { margin: 20px 0; }
+.titulo-destaques {
+  text-align: center; color: var(--verde); letter-spacing: .08em; font-size: .95rem;
+  margin-bottom: 16px; font-weight: 800;
+}
+
+.podio-destaques { display: flex; align-items: flex-end; justify-content: center; gap: 10px; margin-bottom: 20px; }
+.posicao-podio {
+  background: var(--card); border: 1px solid var(--borda); border-radius: 10px 10px 4px 4px;
+  padding: 12px 10px; text-align: center; box-shadow: var(--sombra); width: 110px;
+}
+.posicao-podio .medalha { font-size: 1.6rem; }
+.posicao-podio .nome-posicao { font-weight: 800; font-size: .85rem; margin: 4px 0 2px; word-break: break-word; }
+.posicao-podio .rotulo-posicao { font-size: .68rem; color: var(--texto-suave); text-transform: uppercase; letter-spacing: .04em; }
+.posicao-podio.posicao-1 { padding-top: 20px; padding-bottom: 22px; border-color: var(--ouro); order: 2; }
+.posicao-podio.posicao-2 { padding-bottom: 14px; order: 1; }
+.posicao-podio.posicao-3 { padding-bottom: 8px; order: 3; }
+.posicao-podio.posicao-1 .medalha { font-size: 2.1rem; }
+
+.grade-trofeus { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.cartao-trofeu {
+  background: var(--card); border: 1px solid var(--borda); border-radius: 10px;
+  padding: 12px 10px; text-align: center; box-shadow: var(--sombra);
+}
+.cartao-trofeu .icone-trofeu { font-size: 1.5rem; }
+.cartao-trofeu .titulo-trofeu { font-size: .7rem; color: var(--texto-suave); text-transform: uppercase; letter-spacing: .03em; margin-top: 4px; }
+.cartao-trofeu .nome-trofeu { font-weight: 800; font-size: .88rem; margin: 3px 0 2px; word-break: break-word; }
+.cartao-trofeu .valor-trofeu { font-size: .74rem; color: var(--gramado); font-weight: 600; }
+
 .secao-patrocinadores-campeao { text-align: center; margin: 20px 0; }
 .titulo-patrocinadores { color: var(--verde); letter-spacing: .08em; font-size: .8rem; margin-bottom: 12px; }
 .lista-patrocinadores-estatica { display: flex; flex-direction: column; align-items: center; gap: 12px; }
@@ -199,6 +228,9 @@ table.classificacao tr.classifica td:first-child { border-left: 3px solid var(--
 .partida .status-ok { color: var(--gramado); font-size: .78rem; margin-left: 6px; }
 .partida .data-partida { flex-basis: 100%; order: -1; font-size: .8rem; color: var(--texto-suave); display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
 .partida .data-partida input[type="datetime-local"] { font-size: .8rem; padding: 5px 8px; }
+.partida .linha-wo { flex-basis: 100%; display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.partida .rotulo-wo { font-size: .78rem; color: var(--texto-suave); display: flex; align-items: center; gap: 5px; }
+.partida .in-wo-ausente { font-size: .78rem; padding: 4px 8px; }
 
 .titulo-rodada {
   font-size: .74rem; font-weight: 800; color: var(--verde); text-transform: uppercase;
