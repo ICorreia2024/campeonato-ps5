@@ -112,13 +112,39 @@ function comprimirImagem(arquivo, larguraMax = 640, alturaMax = 320, qualidade =
 
 const TAMANHO_MAX_ARQUIVO_ORIGINAL = 15_000_000; // ~15MB antes de comprimir
 
+function comIntervaloMaximo(promessa, ms, mensagemErro) {
+  return Promise.race([
+    promessa,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(mensagemErro)), ms))
+  ]);
+}
+
 async function adicionarPatrocinador(nome, arquivo) {
   const limpo = nome.trim();
   if (!limpo) { toast('Informe o nome do patrocinador.', 'erro'); return; }
   if (!arquivo) { toast('Selecione uma imagem para o patrocinador.', 'erro'); return; }
   if (arquivo.size > TAMANHO_MAX_ARQUIVO_ORIGINAL) { toast('Imagem muito grande — escolha um arquivo menor.', 'erro'); return; }
+
+  let imagem;
   try {
-    const imagem = await comprimirImagem(arquivo);
+    imagem = await comIntervaloMaximo(comprimirImagem(arquivo), 20000, 'Demorou demais para processar a imagem.');
+  } catch {
+    // Plano B: se o navegador não conseguiu processar a imagem (formato não suportado,
+    // demorou demais etc.), tenta enviar o arquivo original, se não for grande demais.
+    if (arquivo.size <= 1_200_000) {
+      try {
+        imagem = await lerArquivoComoDataUrl(arquivo);
+      } catch {
+        toast('Não foi possível processar essa imagem. Tente uma captura de tela ou outra foto.', 'erro');
+        return;
+      }
+    } else {
+      toast('Não foi possível processar essa imagem neste navegador. Tente uma captura de tela ou outra foto.', 'erro');
+      return;
+    }
+  }
+
+  try {
     const dados = await api('/api/patrocinadores', 'POST', { nome: limpo, imagem });
     await atualizarEstado(dados);
     toast('Patrocinador adicionado!', 'ok');
@@ -445,12 +471,22 @@ function renderParticipantes() {
   app.querySelectorAll('[data-acao="toggle-nota"]').forEach((b) =>
     b.addEventListener('click', () => alternarNota(b.dataset.chave))
   );
-  document.getElementById('btnAddPatrocinador')?.addEventListener('click', async () => {
+  document.getElementById('btnAddPatrocinador')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
     const inputNome = document.getElementById('inNomePatrocinador');
     const inputImagem = document.getElementById('inImagemPatrocinador');
-    await adicionarPatrocinador(inputNome.value, inputImagem.files[0]);
-    inputNome.value = '';
-    inputImagem.value = '';
+    const arquivo = inputImagem.files[0];
+    const textoOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = arquivo ? 'Processando imagem…' : 'Adicionar';
+    try {
+      await adicionarPatrocinador(inputNome.value, arquivo);
+      inputNome.value = '';
+      inputImagem.value = '';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = textoOriginal;
+    }
   });
   document.getElementById('inNomePatrocinador')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.getElementById('btnAddPatrocinador').click();
